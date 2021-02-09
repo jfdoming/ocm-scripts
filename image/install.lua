@@ -101,7 +101,7 @@ function run(arg)
         end
 
         if #directories == 0 then
-            io.stderr:write("No images available. Install some?\n")
+            io.stderr:write("No images available. You can download images from oppm.\n")
             return 1
         end
 
