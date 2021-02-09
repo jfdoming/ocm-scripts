@@ -17,8 +17,8 @@ if #arg == 0 or arg[1] == "help" or COMMANDS[arg[1]] == nil then
     return 0
 end
 
-command = loadfile(COMMANDS[arg[1]])
-if command == nil then
+local status, command = pcall(require, COMMANDS[arg[1]])
+if not status or command == nil then
     io.stderr:write("Failed to run that command!\n")
     return 1
 end
