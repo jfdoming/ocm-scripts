@@ -1,5 +1,5 @@
 local COMMANDS = {
-    ["image"] = "../image/install.lua"
+    ["install"] = "image.install"
 }
 
 local commandKeys = {}
