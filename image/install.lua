@@ -39,7 +39,7 @@ function getFromList(list, listStrings, name, first)
     return list[number]
 end
 
-local DEFAULT_IMAGE_SEARCH_PATH = "/usr/image/images" -- Must end with "/".
+local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
 
