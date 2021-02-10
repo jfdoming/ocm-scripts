@@ -21,9 +21,8 @@ files.readBinary = function(path)
         return nil
     end
 
-    local file = filesystem.open(path, "rb")
+    local file = io.open(path, "rb")
     if file == nil then
-        file:close()
         return nil
     end
     local contents = file:read("*a")
@@ -36,9 +35,8 @@ files.writeBinary = function(path, data)
         return nil
     end
 
-    local file = filesystem.open(path, "wb")
+    local file = io.open(path, "wb")
     if file == nil then
-        file:close()
         return nil
     end
     local result = file:write(data)
