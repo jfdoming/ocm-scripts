@@ -6,12 +6,12 @@ local invoke = component.invoke
 computer.getBootAddress = eeprom.getData
 computer.setBootAddress = eeprom.setData
 
-local function isRFile(f, p)
+local function isPlainFile(f, p)
     return invoke(f, "exists", p) and not invoke(f, "isDirectory", p)
 end
 
 local function pubkey(f)
-    if not isRFile(f, "/.pubkey") then
+    if not isPlainFile(f, "/.pubkey") then
         return nil
     end
     local handle = invoke(f, "open", "/.pubkey")
@@ -21,7 +21,7 @@ local function pubkey(f)
 end
 
 local function sig(f)
-    if not isRFile(f, "/.sig") then
+    if not isPlainFile(f, "/.sig") then
         return nil
     end
     local handle = invoke(f, "open", "/.sig")
@@ -36,7 +36,11 @@ local function boot(f)
     if pk == nil then
         return
     end
-    pk = data.deserializeKey(pk)
+
+    pk = data.deserializeKey(pk, "ec-public")
+    if pk == nil then
+        return
+    end
 
     local sg = sig(f)
     if sg == nil then
@@ -52,7 +56,7 @@ local function boot(f)
     until not chunk
     invoke(f, "close", handle)
 
-    if not data.ecdsa(code, key, sg) then
+    if not data.ecdsa(code, pk, sg) then
         -- Bad signature.
         return
     end
