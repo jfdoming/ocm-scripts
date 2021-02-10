@@ -46,7 +46,7 @@ local IMAGE_BOOT_FILE = "init.lua"
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
 
 
-function run(arg)
+local function run(arg)
     -- Determine the filesystem/directory to write to.
     local chosenFS = arg[1]
     if chosenFS == nil then

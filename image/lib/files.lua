@@ -64,5 +64,6 @@ files.sign = function(path)
 
     local sigpath = path .. SIG_SUFFIX
     return files.writeBinary(sigpath)
+end
 
 return files
