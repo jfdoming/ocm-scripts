@@ -12,6 +12,10 @@ files.isPlainFile = function(path)
     return filesystem.exists(path) and not filesystem.isDirectory(path)
 end
 
+files.isPlainDirectory = function(path)
+    return filesystem.exists(path) and filesystem.isDirectory(path)
+end
+
 files.copy = function(source, dest)
     local copy = assert(loadfile("/bin/cp.lua"))
     copy("-ur", source, dest)
@@ -32,7 +36,7 @@ files.readBinary = function(path)
 end
 
 files.writeBinary = function(path, data)
-    if not files.isPlainFile(path) then
+    if files.isPlainDirectory(path) then
         return nil
     end
 
@@ -56,13 +60,13 @@ files.sign = function(path)
         return false
     end
 
-    local sig = crypto.sig(data, key)
+    local sig = crypto.sig(data, prkey)
     if sig == nil then
         return false
     end
 
     local sigpath = path .. files.SIG_SUFFIX
-    return files.writeBinary(sigpath)
+    return files.writeBinary(sigpath, sig)
 end
 
 return files
