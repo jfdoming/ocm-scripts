@@ -52,7 +52,7 @@ local function run(arg)
     if chosenFS == nil then
         -- No installation path specified, let the user choose.
         mounts = filesystem.mounts()
-        files = {}
+        fileEntries = {}
         fileLabels = {}
         for node, mount in mounts do
             local label = node.getLabel()
@@ -62,16 +62,16 @@ local function run(arg)
                 label = "Filesystem \"" .. label .. "\""
             end
             label = label .. " at path \"" .. mount .. "\""
-            files[#files + 1] = mount
+            fileEntries[#fileEntries + 1] = mount
             fileLabels[#fileLabels + 1] = label
         end
 
-        if #files == 0 then
+        if #fileEntries == 0 then
             io.stderr:write("How are you running on a system with no filesystem?\n")
             return 1
         end
 
-        chosenFS = getFromList(files, fileLabels, "filesystems", true)
+        chosenFS = getFromList(fileEntries, fileLabels, "filesystems", true)
         if chosenFS == nil then
             io.stderr:write("Please specify a filesystem to install to.\n")
             return 1
@@ -92,10 +92,10 @@ local function run(arg)
     -- Determine the image to use.
     local chosenImage = arg[2]
     if chosenImage == nil then
-        files = filesystem.list(DEFAULT_IMAGE_SEARCH_PATH)
+        fileEntries = filesystem.list(DEFAULT_IMAGE_SEARCH_PATH)
         directories = {}
         directoryLabels = {}
-        for file in files do
+        for file in fileEntries do
             if filesystem.isDirectory(DEFAULT_IMAGE_SEARCH_PATH .. file) then
                 directories[#directories + 1] = file
                 directoryLabels[#directoryLabels + 1] = "Image \"" .. filesystem.name(file) .. "\""
