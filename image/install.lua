@@ -1,6 +1,7 @@
-filesystem = require("filesystem")
+local filesystem = require("filesystem")
+local files = require("image.lib.files")
 
-function getFromList(list, listStrings, name, first)
+local function getFromList(list, listStrings, name, first)
     if #list == 0 then
         return false
     end
@@ -41,6 +42,7 @@ end
 
 local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
+local IMAGE_BOOT_FILE = "init.lua"
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
 
 
@@ -153,8 +155,8 @@ function run(arg)
 
     -- Copy over the image files.
     print("Installing image...")
-    local copy = assert(loadfile("/bin/cp.lua"))
-    copy("-ur", chosenImage, chosenFS)
+    files.copy(chosenImage, chosenFS)
+    files.sign(chosenFS .. IMAGE_BOOT_FILE)
     print("Image installed.")
 
     if filesystem.exists(chosenFS .. IMAGE_POST_INSTALL_FILE) then
