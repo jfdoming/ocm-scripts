@@ -1,5 +1,5 @@
 local COMMANDS = {
-    ["install"] = "image.impl.install"
+    ["install"] = "image.install"
 }
 
 local commandKeys = {}

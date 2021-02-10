@@ -1,5 +1,5 @@
 local filesystem = require("filesystem")
-local files = require("image.lib.files")
+local files = require("ocmutils.files")
 
 local function getFromList(list, listStrings, name, first)
     if #list == 0 then

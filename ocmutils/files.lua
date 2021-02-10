@@ -1,11 +1,12 @@
 filesystem = require("filesystem")
 
-crypto = require("image.lib.crypto")
-
-local PRKEY_PATH = "/.prkey"
-local SIG_SUFFIX = ".sig"
+crypto = require("ocmutils.crypto")
 
 local files = {}
+
+files.PUBKEY_PATH = "/.pubkey"
+files.PRKEY_PATH = "/.prkey"
+files.SIG_SUFFIX = ".sig"
 
 files.isPlainFile = function(path)
     return filesystem.exists(path) and not filesystem.isDirectory(path)
@@ -50,7 +51,7 @@ files.sign = function(path)
         return false
     end
 
-    local prkey = files.readBinary(PRKEY_PATH)
+    local prkey = files.readBinary(files.PRKEY_PATH)
     if prkey == nil then
         return false
     end
@@ -60,7 +61,7 @@ files.sign = function(path)
         return false
     end
 
-    local sigpath = path .. SIG_SUFFIX
+    local sigpath = path .. files.SIG_SUFFIX
     return files.writeBinary(sigpath)
 end
 
