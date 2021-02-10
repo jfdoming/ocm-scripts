@@ -1,3 +1,5 @@
+component = require("component")
+
 local crypto = {}
 
 crypto.sig = function(data, prkey, sig)

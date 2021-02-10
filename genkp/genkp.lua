@@ -1,3 +1,4 @@
+component = require("component")
 files = require("ocmutils.files")
 
 if files.isPlainFile(files.PRKEY_PATH) then
