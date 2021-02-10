@@ -16,3 +16,5 @@ if not files.writeBinary(files.PRKEY_PATH, prkey.serialize()) then
     io.stderr:write("Failed to write private key.\n")
     return 1
 end
+
+print("Keypair successfully generated.")
