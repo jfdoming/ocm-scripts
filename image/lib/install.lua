@@ -156,7 +156,9 @@ local function run(arg)
     -- Copy over the image files.
     print("Installing image...")
     files.copy(chosenImage, chosenFS)
-    files.sign(chosenFS .. IMAGE_BOOT_FILE)
+    if not files.sign(chosenFS .. IMAGE_BOOT_FILE) then
+        io.stderr:write("Warning: Failed to sign some files in the image. Your image may not boot correctly.\n")
+    end
     print("Image installed.")
 
     if filesystem.exists(chosenFS .. IMAGE_POST_INSTALL_FILE) then
