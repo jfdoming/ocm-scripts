@@ -3,6 +3,60 @@ local fs = component.list("filesystem")
 local eeprom = component.proxy(component.list("eeprom")())
 local invoke = component.invoke
 
+local screen = component.list("screen")()
+local gpu, w, h = nil, nil, nil
+if screen ~= nil then
+    gpu = component.proxy(component.list("gpu")())
+    gpu.bind(screen)
+    gpu.setResolution(gpu.maxResolution())
+    w, h = gpu.getResolution()
+end
+
+local printy = 1
+local function _write(s)
+    if s:sub(-1) ~= "\n" then
+        s = s .. "\n"
+    end
+    s = s:gsub("%\t", "        ")
+    for l in s:gmatch("(.-)\n") do
+        while l ~= "" do
+            gpu.set(1, printy, l)
+            printy = printy + 1
+            l = l:sub(w + 1, -1)
+        end
+    end
+end
+function print(s)
+    if gpu == nil then
+        return false
+    end
+
+    gpu.setForeground(0xFFFFFF)
+    _write(s)
+    return true
+end
+function printerr(s)
+    if gpu == nil then
+        return false
+    end
+
+    gpu.setForeground(0xFF0000)
+    _write(s)
+    return true
+end
+function clear()
+    if gpu == nil then
+        return false
+    end
+
+    gpu.setForeground(0xFFFFFF)
+    gpu.setBackground(0x000000)
+    gpu.fill(1, 1, w, h, " ")
+    printy = 1
+end
+
+clear()
+
 computer.getBootAddress = eeprom.getData
 computer.setBootAddress = eeprom.setData
 
@@ -15,17 +69,17 @@ local function pubkey(f)
         return nil
     end
     local handle = invoke(f, "open", "/.pubkey")
-    local key = invoke(f, "read", handle, 256)
+    local key = invoke(f, "read", handle, math.huge)
     invoke(f, "close", handle)
     return key
 end
 
 local function sig(f)
-    if not isPlainFile(f, "/.sig") then
+    if not isPlainFile(f, "/init.lua.sig") then
         return nil
     end
-    local handle = invoke(f, "open", "/.sig")
-    local sig = invoke(f, "read", handle, 256)
+    local handle = invoke(f, "open", "/init.lua.sig")
+    local sig = invoke(f, "read", handle, math.huge)
     invoke(f, "close", handle)
     return sig
 end
@@ -34,17 +88,20 @@ end
 local function boot(f)
     local pk = pubkey(f)
     if pk == nil then
-        return
+        print("Skipping image due to missing public key.")
+        return false
     end
 
     pk = data.deserializeKey(pk, "ec-public")
     if pk == nil then
-        return
+        print("Skipping image due to invalid public key.")
+        return false
     end
 
     local sg = sig(f)
     if sg == nil then
-        return
+        print("Skipping image due to missing signature.")
+        return false
     end
 
     computer.setBootAddress(f)
@@ -57,17 +114,42 @@ local function boot(f)
     invoke(f, "close", handle)
 
     if not data.ecdsa(code, pk, sg) then
-        -- Bad signature.
-        return
+        print("Skipping image due to bad signature.")
+        return false
     end
 
     computer.beep()
-    load(code)()
+    clear()
+    result, what = load(code)
+    if result == nil then
+        print("Skipping image due to invalid code.")
+        return false
+    end
+    result, err = xpcall(result, debug.traceback)
+    if err == nil then
+        printerr("Error: Do not return from an image entrypoint!")
+    else
+        printerr("Image crashed! Details:")
+        printerr(err)
+        if gpu == nil then
+            error(err)
+        end
+    end
+    return true
 end
 
+local found = false
 for f, _ in pairs(fs) do
     if invoke(f, "exists", "/init.lua") and not invoke(f, "isDirectory", "/init.lua") then
-        boot(f)
+        print("Located image to load.")
+        if boot(f) then
+            found = true
+        end
         break
     end
 end
+
+if not found then
+    print("No valid images found.")
+end
+while true do coroutine.yield() end
