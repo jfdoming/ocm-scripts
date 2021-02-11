@@ -1,5 +1,6 @@
 local COMMANDS = {
-    ["install"] = "image.install"
+    ["flash"] = "image.flash",
+    ["install"] = "image.install",
 }
 
 local commandKeys = {}
