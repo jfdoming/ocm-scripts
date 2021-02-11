@@ -1,5 +1,6 @@
 component = require("component")
 eeprom = component.eeprom
+data = component.data
 
 files = require("ocmutils.files")
 input = require("ocmutils.input")
@@ -18,8 +19,10 @@ local function run()
         error("Please generate a public key first.")
         return 1
     end
-    local addedCode = "eeprom = component.proxy(component.list(\"eeprom\")())\n"
-    addedCode = addedCode .. "eeprom.setData(\"" .. pubkey .. "\")\n"
+
+    -- B64 encoding is not for security (obviously it's no more secure), but
+    -- rather just so that the key is in plaintext.
+    local addedCode = "local pubkey = \"" .. data.encode64(pubkey) .. "\"\n"
     bios = addedCode .. bios
 
     if not input.confirm("Please type \"ok\" to confirm the installation: ", {"ok"}) then
