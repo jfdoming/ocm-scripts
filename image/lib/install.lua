@@ -4,7 +4,7 @@ local input = require("ocmutils.input")
 
 local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
-local IMAGE_BOOT_FILE = "init.lua"
+local IMAGE_BOOT_FILE = "/usr/share/image/image_init.lua"
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
 
 
@@ -112,10 +112,11 @@ local function run(arg)
 
     -- Copy over the image files.
     print("Installing image...")
-    files.copy(files.PUBKEY_PATH, chosenFS)
     files.copy(chosenImage, chosenFS)
-    if not files.sign(chosenFS .. IMAGE_BOOT_FILE) then
-        io.stderr:write("Warning: Failed to sign some files in the image. Your image may not boot correctly.\n")
+    files.copy(IMAGE_BOOT_FILE, chosenFS)
+    if not files.compileAndSignAll(chosenFS) then
+        io.stderr:write("Error: Failed to sign some files in the image. Your image may not boot correctly.\n")
+        return 1
     end
     print("Image installed.")
 

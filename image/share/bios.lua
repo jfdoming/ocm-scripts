@@ -14,9 +14,14 @@ end
 
 local printy = 1
 local function _write(s)
+    if s == nil then
+        s = "nil\n"
+    end
+
     if s:sub(-1) ~= "\n" then
         s = s .. "\n"
     end
+
     s = s:gsub("%\t", "        ")
     for l in s:gmatch("(.-)\n") do
         while l ~= "" do
@@ -65,10 +70,11 @@ local function isPlainFile(f, p)
 end
 
 local function sig(f, path)
-    if not isPlainFile(f, path .. ".sig") then
+    path = path .. ".sig"
+    if not isPlainFile(f, path) then
         return nil
     end
-    local handle = invoke(f, "open", path .. ".sig")
+    local handle = invoke(f, "open", path)
     local sig = invoke(f, "read", handle, math.huge)
     invoke(f, "close", handle)
     return sig
@@ -76,13 +82,15 @@ end
 
 
 function exec(path)
-    local sg = sig(f)
+    path = path .. ".bin"
+    local f = computer.getBootAddress()
+    local sg = sig(f, path)
     if sg == nil then
         print("Skipping due to missing signature.")
         return false
     end
 
-    local handle = invoke(f, "open", "/init.lua")
+    local handle = invoke(f, "open", path)
     local code = ""
     repeat
         local chunk = invoke(f, "read", handle, math.huge)
@@ -90,7 +98,7 @@ function exec(path)
     until not chunk
     invoke(f, "close", handle)
 
-    if not data.ecdsa(code, pk, sg) then
+    if not data.ecdsa(code, pubkey, sg) then
         print("Skipping due to bad signature.")
         return false
     end
@@ -107,7 +115,7 @@ local function boot(f)
     computer.setBootAddress(f)
     computer.beep(440, 0.5)
     clear()
-    result, what = exec(code)
+    result, what = exec("/image_init.lua")
     if result == false then
         return false
     end
@@ -137,7 +145,7 @@ if pubkey == nil then
 else
     local found = false
     for f, _ in pairs(fs) do
-        if isPlainFile(f, "/init.lua") then
+        if isPlainFile(f, "/image_init.lua.bin") then
             print("Located image to load.")
             if boot(f) then
                 found = true
