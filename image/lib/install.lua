@@ -126,8 +126,6 @@ local function run(arg)
         end
         return 1
     end
-    epubkey = component.data.decode64(epubkey)
-    epubkey = component.data.deserializeKey(epubkey, "ec-public")
 
     local iv = peerTable[epubkey]
     if iv == nil then
@@ -138,6 +136,9 @@ local function run(arg)
         end
         return 1
     end
+
+    epubkey = component.data.decode64(epubkey)
+    epubkey = component.data.deserializeKey(epubkey, "ec-public")
     iv = component.data.decode64(iv)
 
     -- Enable write protection.
