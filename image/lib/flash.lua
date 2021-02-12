@@ -30,7 +30,12 @@ local function run()
         return 1
     end
 
-    eeprom.set(bios)
+    local _, err = eeprom.set(bios)
+    if err ~= nil then
+        print("Error: " .. err)
+        return 1
+    end
+    eeprom.setLabel("EEPROM (Robot OS)")
     eeprom.makeReadonly(eeprom.getChecksum())
     print("Flash complete.")
 

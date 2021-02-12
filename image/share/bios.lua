@@ -64,25 +64,24 @@ local function isPlainFile(f, p)
     return invoke(f, "exists", p) and not invoke(f, "isDirectory", p)
 end
 
-local function sig(f)
-    if not isPlainFile(f, "/init.lua.sig") then
+local function sig(f, path)
+    if not isPlainFile(f, path .. ".sig") then
         return nil
     end
-    local handle = invoke(f, "open", "/init.lua.sig")
+    local handle = invoke(f, "open", path .. ".sig")
     local sig = invoke(f, "read", handle, math.huge)
     invoke(f, "close", handle)
     return sig
 end
 
 
-local function boot(f)
+function exec(path)
     local sg = sig(f)
     if sg == nil then
-        print("Skipping image due to missing signature.")
+        print("Skipping due to missing signature.")
         return false
     end
 
-    computer.setBootAddress(f)
     local handle = invoke(f, "open", "/init.lua")
     local code = ""
     repeat
@@ -92,18 +91,31 @@ local function boot(f)
     invoke(f, "close", handle)
 
     if not data.ecdsa(code, pk, sg) then
-        print("Skipping image due to bad signature.")
+        print("Skipping due to bad signature.")
         return false
     end
 
+    local result, what = load(code)
+    if result == nil then
+        print("Skipping due to invalid code.")
+        return false
+    end
+    return xpcall(result, debug.traceback)
+end
+
+local function boot(f)
+    computer.setBootAddress(f)
     computer.beep(440, 0.5)
     clear()
-    result, what = load(code)
+    result, what = exec(code)
+    if result == false then
+        return false
+    end
     if result == nil then
         print("Skipping image due to invalid code.")
         return false
     end
-    result, err = xpcall(result, debug.traceback)
+    local result, err = xpcall(result, debug.traceback)
     if err == nil then
         printerr("Error: Do not return from an image entrypoint!")
     else
