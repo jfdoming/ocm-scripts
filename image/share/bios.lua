@@ -117,7 +117,7 @@ if spubkey ~= nil and eprkey ~= nil and iv ~= nil then
     spubkey = data.deserializeKey(data.decode64(spubkey), "ec-public")
     eprkey = data.deserializeKey(data.decode64(eprkey), "ec-private")
     iv = data.decode64(iv)
-    local shkey = data.ecdh(eprkey, spubkey)
+    local shkey = data.ecdh(eprkey, spubkey):sub(8, 23)
     eprkey = nil
 end
 
