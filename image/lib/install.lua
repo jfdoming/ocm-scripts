@@ -1,4 +1,6 @@
 local filesystem = require("filesystem")
+local serialization = require("serialization")
+
 local files = require("ocmutils.files")
 local input = require("ocmutils.input")
 
@@ -6,6 +8,7 @@ local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
 local IMAGE_BOOT_FILE = "/usr/share/image/image_init.lua"
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
+local EEPROM_TABLE_FILE = "/.flashed"
 
 
 local function run(arg)
@@ -110,11 +113,35 @@ local function run(arg)
     file:close()
     print("Write protection enabled.")
 
+    -- Determine EEPROM pubkey.
+    local eepromTable = files.readBinary(EEPROM_TABLE_FILE)
+    if eepromTable == nil then
+        io.stderr:write("Failed to read EEPROM table.\n")
+        return 1
+    else
+        eepromTable = serialization.unserialize(eepromTable)
+    end
+    if component.eeprom == nil then
+        io.stderr:write("No EEPROM present.\n")
+        return 1
+    end
+    eepromTable = eepromTable[component.eeprom.address]
+    if eepromTable == nil then
+        io.stderr:write("EEPROM metadata corrupted.")
+        return 1
+    end
+    local epubkey = eepromTable["pubkey"]
+    local iv = eepromTable["iv"]
+    if epubkey == nil or iv == nil then
+        io.stderr:write("EEPROM metadata corrupted.")
+        return 1
+    end
+
     -- Copy over the image files.
     print("Installing image...")
     files.copy(chosenImage, chosenFS)
     files.copy(IMAGE_BOOT_FILE, chosenFS)
-    if not files.encryptAndSignAll(chosenFS) then
+    if not files.encryptAndSignAll(chosenFS, epubkey, iv) then
         io.stderr:write("Error: Failed to sign some files in the image. Your image may not boot correctly.\n")
         return 1
     end

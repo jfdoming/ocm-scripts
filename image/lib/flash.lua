@@ -18,18 +18,18 @@ local function run()
     local prod = input.confirm("Is this a production image? ")
 
     if not input.confirm("Please type \"ok\" to confirm the flash: ", {"ok"}) then
-        io.stderr:write("Flash aborted.")
+        io.stderr:write("Flash aborted.\n")
         return 1
     end
 
     local bios = files.readBinary(DEFAULT_IMAGE_SEARCH_PATH .. BIOS_FILE)
     if bios == nil then
-        io.stderr:write("Corrupted installation.")
+        io.stderr:write("Corrupted installation.\n")
         return 1
     end
     local spubkey = files.readBinary(files.PUBKEY_PATH)
     if bios == nil then
-        io.stderr:write("Please generate a public key first.")
+        io.stderr:write("Please generate a public key first.\n")
         return 1
     end
 
@@ -41,7 +41,7 @@ local function run()
     if eepromTable == nil then
         -- File doesn't exist yet?
         if filesystem.exists(EEPROM_TABLE_FILE) then
-            io.stderr:write("Failed to read EEPROM table.")
+            io.stderr:write("Failed to read EEPROM table.\n")
             return 1
         end
         eepromTable = {}
@@ -57,7 +57,7 @@ local function run()
     eepromTable[eeprom.address] = tableEntry
 
     if not files.writeBinary(EEPROM_TABLE_FILE, serialization.serialize(eepromTable)) then
-        io.stderr:write("Failed to write EEPROM table.")
+        io.stderr:write("Failed to write EEPROM table.\n")
         return 1
     end
 
@@ -67,7 +67,7 @@ local function run()
 
     local _, err = eeprom.set(bios)
     if err ~= nil then
-        print("Error: " .. err)
+        io.stderr:write("Error: " .. err .. "\n")
         return 1
     end
     if prod then
