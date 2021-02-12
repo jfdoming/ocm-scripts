@@ -10,7 +10,7 @@ local input = require("ocmutils.input")
 
 local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/"
 local BIOS_FILE = "bios.lua"
-local EEPROM_TABLE_FILE = "/.flashed"
+local PEERS_TABLE_FILE = "/.peers"
 local AES_IV_SIZE = 16
 
 
@@ -33,35 +33,34 @@ local function run()
         return 1
     end
 
-    -- B64 encoding is not for security (obviously it's no more secure), but
-    -- rather just so that the key is in plaintext.
-    local addedCode = "local spubkey = \"" .. data.encode64(spubkey) .. "\"\n"
-
-    local eepromTable = files.readBinary(EEPROM_TABLE_FILE)
-    if eepromTable == nil then
+    local peersTable = files.readBinary(PEERS_TABLE_FILE)
+    if peersTable == nil then
         -- File doesn't exist yet?
-        if filesystem.exists(EEPROM_TABLE_FILE) then
-            io.stderr:write("Failed to read EEPROM table.\n")
+        if filesystem.exists(PEERS_TABLE_FILE) then
+            io.stderr:write("Failed to read peers table.\n")
             return 1
         end
-        eepromTable = {}
+        peersTable = {}
     else
-        eepromTable = serialization.unserialize(eepromTable)
+        peersTable = serialization.unserialize(peersTable)
     end
 
     local epubkey, eprkey = data.generateKeyPair()
+    epubkey = data.encode64(epubkey:serialize())
+    eprkey = data.encode64(eprkey:serialize())
     local iv = data.random(AES_IV_SIZE)
-    local tableEntry = {}
-    tableEntry["pubkey"] = data.encode64(epubkey:serialize())
-    tableEntry["iv"] = iv
-    eepromTable[eeprom.address] = tableEntry
+    peersTable[epubkey] = iv
 
-    if not files.writeBinary(EEPROM_TABLE_FILE, serialization.serialize(eepromTable)) then
-        io.stderr:write("Failed to write EEPROM table.\n")
+    if not files.writeBinary(PEERS_TABLE_FILE, serialization.serialize(eepromTable)) then
+        io.stderr:write("Failed to write peers table.\n")
         return 1
     end
 
-    addedCode = addedCode .. "local eprkey = \"" .. data.encode64(eprkey:serialize()) .. "\"\n"
+    -- B64 encoding is not for security (obviously it's no more secure), but
+    -- rather just so that the key is in plaintext.
+    local addedCode = "-- " .. epubkey
+    addedCode = addedCode .. "local spubkey = \"" .. data.encode64(spubkey) .. "\"\n"
+    addedCode = addedCode .. "local eprkey = \"" .. eprkey .. "\"\n"
     addedCode = addedCode .. "local iv = \"" .. data.encode64(iv) .. "\"\n"
     bios = addedCode .. bios
 

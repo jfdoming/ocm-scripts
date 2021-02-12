@@ -9,7 +9,7 @@ local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
 local IMAGE_BOOT_FILE = "/usr/share/image/image_init.lua"
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
-local EEPROM_TABLE_FILE = "/.flashed"
+local PEERS_TABLE_FILE = "/.peers"
 
 
 local function run(arg)
@@ -114,29 +114,30 @@ local function run(arg)
     file:close()
     print("Write protection enabled.")
 
-    -- Determine EEPROM pubkey.
-    local eepromTable = files.readBinary(EEPROM_TABLE_FILE)
-    if eepromTable == nil then
-        io.stderr:write("Failed to read EEPROM table.\n")
+    -- Determine peer pubkey.
+    local peerTable = files.readBinary(PEERS_TABLE_FILE)
+    if peerTable == nil then
+        io.stderr:write("Failed to read peer table.\n")
         return 1
     else
-        eepromTable = serialization.unserialize(eepromTable)
+        peerTable = serialization.unserialize(peerTable)
     end
     if component.eeprom == nil then
         io.stderr:write("No EEPROM present.\n")
         return 1
     end
-    eepromTable = eepromTable[component.eeprom.address]
-    if eepromTable == nil then
+    local eepromData = component.eeprom.get()
+    local epubkey = eepromData:sub(4, eepromData:find("\n") - 1)
+    if epubkey == nil or epubkey == "" then
         io.stderr:write("EEPROM metadata corrupted.")
         return 1
     end
-    local epubkey = eepromTable["pubkey"]
-    local iv = eepromTable["iv"]
-    if epubkey == nil or iv == nil then
+    local iv = peerTable[epubkey]
+    if iv == nil then
         io.stderr:write("EEPROM metadata corrupted.")
         return 1
     end
+    epubkey = component.data.deserializeKey(epubkey)
 
     -- Copy over the image files.
     print("Installing image...")
