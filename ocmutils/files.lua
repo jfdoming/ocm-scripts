@@ -63,7 +63,7 @@ files.encrypt = function(path, shkey, iv)
     if encrypted == nil then
         return false
     end
-    return files.writeBinary(source .. files.BIN_SUFFIX, encrypted)
+    return files.writeBinary(path .. files.BIN_SUFFIX, encrypted)
 end
 
 files.sign = function(path, prkey)
