@@ -91,7 +91,7 @@ files.sign = function(path, prkey)
     return files.writeBinary(sigpath, sig)
 end
 
-files.compileAndSignAll = function(sourceDir)
+files.encryptAndSignAll = function(sourceDir)
     if not files.isPlainDirectory(sourceDir) then
         return false
     end
