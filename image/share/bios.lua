@@ -98,12 +98,12 @@ function exec(path)
     until not chunk
     invoke(f, "close", handle)
 
-    if not data.ecdsa(code, pubkey, sg) then
+    if not data.ecdsa(code, spubkey, sg) then
         print("Skipping due to bad signature.")
         return false
     end
 
-    code = data.decrypt(code, pubkey)
+    code = data.decrypt(code, shkey, iv)
 
     local result, what = load(code)
     if result == nil then
@@ -138,12 +138,16 @@ local function boot(f)
     return true
 end
 
-if pubkey ~= nil then
-    pubkey = data.deserializeKey(data.decode64(pubkey), "ec-public")
+if spubkey ~= nil and eprkey ~= nil and iv ~= nil then
+    spubkey = data.deserializeKey(data.decode64(spubkey), "ec-public")
+    eprkey = data.deserializeKey(data.decode64(eprkey), "ec-private")
+    iv = data.decode64(iv)
+    local shkey = data.ecdh(eprkey, spubkey)
+    eprkey = nil
 end
 
-if pubkey == nil then
-    printerr("Invalid public key.")
+if shkey == nil then
+    printerr("Invalid keypair.")
 else
     local found = false
     for f, _ in pairs(fs) do
