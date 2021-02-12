@@ -114,7 +114,7 @@ local function run(arg)
     print("Installing image...")
     files.copy(chosenImage, chosenFS)
     files.copy(IMAGE_BOOT_FILE, chosenFS)
-    if not files.compileAndSignAll(chosenFS) then
+    if not files.encryptAndSignAll(chosenFS) then
         io.stderr:write("Error: Failed to sign some files in the image. Your image may not boot correctly.\n")
         return 1
     end

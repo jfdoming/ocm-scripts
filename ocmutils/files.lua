@@ -50,26 +50,36 @@ files.writeBinary = function(path, data)
     return result
 end
 
-files.compile = function(source)
+files.encrypt = function(source, prkey)
     if not files.isPlainFile(source) then
         return false
     end
+
+    if prkey == nil then
+        prkey = files.readBinary(files.PRKEY_PATH)
+        if prkey == nil then
+            return false
+        end
+    end
+
     code = loadfile(source)
     if code == nil then
         return false
     end
-    return files.writeBinary(source .. files.BIN_SUFFIX, string.dump(code))
+    return files.writeBinary(source .. files.BIN_SUFFIX, data.encrypt(code, prkey))
 end
 
-files.sign = function(path)
+files.sign = function(path, prkey)
     local data = files.readBinary(path)
     if data == nil then
         return false
     end
 
-    local prkey = files.readBinary(files.PRKEY_PATH)
     if prkey == nil then
-        return false
+        prkey = files.readBinary(files.PRKEY_PATH)
+        if prkey == nil then
+            return false
+        end
     end
 
     local sig = crypto.sig(data, prkey)
@@ -83,6 +93,11 @@ end
 
 files.compileAndSignAll = function(sourceDir)
     if not files.isPlainDirectory(sourceDir) then
+        return false
+    end
+
+    local prkey = files.readBinary(files.PRKEY_PATH)
+    if prkey == nil then
         return false
     end
 
@@ -102,13 +117,13 @@ files.compileAndSignAll = function(sourceDir)
                 queue.curr = queue.curr + 1
             elseif files.isPlainFile(file) then
                 if string.sub(file, -4, -1) == ".lua" then
-                    if not files.compile(file) then
+                    if not files.encrypt(file, prkey) then
                         return false
                     end
                     filesystem.remove(file)
                     file = file .. files.BIN_SUFFIX
                 end
-                if not files.sign(file) then
+                if not files.sign(file, prkey) then
                     return false
                 end
             end

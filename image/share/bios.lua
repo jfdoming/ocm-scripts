@@ -103,6 +103,8 @@ function exec(path)
         return false
     end
 
+    code = data.decrypt(code, pubkey)
+
     local result, what = load(code)
     if result == nil then
         print("Skipping due to invalid code.")
