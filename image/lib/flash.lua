@@ -58,7 +58,7 @@ local function run()
 
     -- B64 encoding is not for security (obviously it's no more secure), but
     -- rather just so that the key is in plaintext.
-    local addedCode = "-- " .. epubkey
+    local addedCode = "-- " .. epubkey .. "\n"
     addedCode = addedCode .. "local spubkey = \"" .. data.encode64(spubkey) .. "\"\n"
     addedCode = addedCode .. "local eprkey = \"" .. eprkey .. "\"\n"
     addedCode = addedCode .. "local iv = \"" .. data.encode64(iv) .. "\"\n"
