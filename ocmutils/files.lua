@@ -49,8 +49,9 @@ files.writeBinary = function(path, data)
     return result
 end
 
-files.encrypt = function(source, shkey, iv)
-    if not files.isPlainFile(source) then
+files.encrypt = function(path, shkey, iv)
+    local data = files.readBinary(path)
+    if data == nil then
         return false
     end
 
@@ -58,11 +59,11 @@ files.encrypt = function(source, shkey, iv)
         return false
     end
 
-    code = loadfile(source)
-    if code == nil then
+    local encrypted = component.data.encrypt(data, shkey, iv)
+    if encrypted == nil then
         return false
     end
-    return files.writeBinary(source .. files.BIN_SUFFIX, component.data.encrypt(code, shkey, iv))
+    return files.writeBinary(source .. files.BIN_SUFFIX, encrypted)
 end
 
 files.sign = function(path, prkey)
@@ -107,6 +108,10 @@ files.encryptAndSignAll = function(sourceDir, epubkey, iv)
     if shkey == nil then
         return false
     end
+
+    -- Unfortunately, this AES implementation only takes 128-bit keys.
+    -- Choose a substring of the generated key as our shared key.
+    shkey = shkey:sub(8, 23)
 
     if string.sub(sourceDir, -1) ~= "/" then
         sourceDir = sourceDir .. "/"
