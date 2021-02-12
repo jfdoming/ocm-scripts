@@ -1,44 +1,6 @@
 local filesystem = require("filesystem")
 local files = require("ocmutils.files")
-
-local function getFromList(list, listStrings, name, first)
-    if #list == 0 then
-        return false
-    end
-
-    if #list == 1 then
-        return list[1]
-    end
-
-    print("Available " .. name .. ":")
-    print()
-
-    for i, el in ipairs(listStrings) do
-        print(i .. ") " .. el)
-    end
-    print()
-
-    local number = nil
-    while true do
-        io.write("Select a number from 1 to " .. #list .. ": ")
-        number = io.read()
-        if number == nil or number == false then
-            return nil
-        end
-        number = tonumber(number)
-        if number ~= nil and number >= 1 and number <= #list then
-            break
-        end
-        print("Invalid number.")
-    end
-
-    if list[number] == nil then
-        return nil
-    end
-
-    print()
-    return list[number]
-end
+local input = require("ocmutils.input")
 
 local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
@@ -71,7 +33,7 @@ local function run(arg)
             return 1
         end
 
-        chosenFS = getFromList(fileEntries, fileLabels, "filesystems", true)
+        chosenFS = input.getFromList(fileEntries, fileLabels, "filesystems", true)
         if chosenFS == nil then
             io.stderr:write("Please specify a filesystem to install to.\n")
             return 1
@@ -107,7 +69,7 @@ local function run(arg)
             return 1
         end
 
-        chosenImage = getFromList(directories, directoryLabels, "images", false)
+        chosenImage = input.getFromList(directories, directoryLabels, "images", false)
         if chosenImage == nil then
             io.stderr:write("Please specify an image directory to install.\n")
             return 1
@@ -129,12 +91,7 @@ local function run(arg)
     print("Using image from " .. chosenImage)
     print()
 
-    io.write("Please type \"ok\" to confirm the installation: ")
-    answer = io.read()
-    if answer == nil or answer == false or string.lower(answer) ~= "ok" then
-        if answer == nil then
-            print()
-        end
+    if not input.confirm("Please type \"ok\" to confirm the installation: ", {"ok"}) then
         io.stderr:write("Installation aborted.\n")
         return 1
     end

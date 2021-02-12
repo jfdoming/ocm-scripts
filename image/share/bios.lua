@@ -64,16 +64,6 @@ local function isPlainFile(f, p)
     return invoke(f, "exists", p) and not invoke(f, "isDirectory", p)
 end
 
-local function pubkey(f)
-    if not isPlainFile(f, "/.pubkey") then
-        return nil
-    end
-    local handle = invoke(f, "open", "/.pubkey")
-    local key = invoke(f, "read", handle, math.huge)
-    invoke(f, "close", handle)
-    return key
-end
-
 local function sig(f)
     if not isPlainFile(f, "/init.lua.sig") then
         return nil
@@ -86,18 +76,6 @@ end
 
 
 local function boot(f)
-    local pk = pubkey(f)
-    if pk == nil then
-        print("Skipping image due to missing public key.")
-        return false
-    end
-
-    pk = data.deserializeKey(pk, "ec-public")
-    if pk == nil then
-        print("Skipping image due to invalid public key.")
-        return false
-    end
-
     local sg = sig(f)
     if sg == nil then
         print("Skipping image due to missing signature.")
@@ -118,7 +96,7 @@ local function boot(f)
         return false
     end
 
-    computer.beep()
+    computer.beep(440, 0.5)
     clear()
     result, what = load(code)
     if result == nil then
@@ -138,18 +116,26 @@ local function boot(f)
     return true
 end
 
-local found = false
-for f, _ in pairs(fs) do
-    if invoke(f, "exists", "/init.lua") and not invoke(f, "isDirectory", "/init.lua") then
-        print("Located image to load.")
-        if boot(f) then
-            found = true
+if pubkey ~= nil then
+    pubkey = data.deserializeKey(data.decode64(pubkey), "ec-public")
+end
+
+if pubkey == nil then
+    printerr("Invalid public key.")
+else
+    local found = false
+    for f, _ in pairs(fs) do
+        if isPlainFile(f, "/init.lua") then
+            print("Located image to load.")
+            if boot(f) then
+                found = true
+            end
+            break
         end
-        break
+    end
+    if not found then
+        print("No valid images found.")
     end
 end
 
-if not found then
-    print("No valid images found.")
-end
 while true do coroutine.yield() end
