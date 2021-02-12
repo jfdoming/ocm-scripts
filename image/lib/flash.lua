@@ -28,10 +28,11 @@ local function run()
         return 1
     end
     local spubkey = files.readBinary(files.PUBKEY_PATH)
-    if bios == nil then
+    if spubkey == nil then
         io.stderr:write("Please generate a public key first.\n")
         return 1
     end
+    spubkey = data.encode64(spubkey)
 
     local peersTable = files.readBinary(PEERS_TABLE_FILE)
     if peersTable == nil then
@@ -48,7 +49,7 @@ local function run()
     local epubkey, eprkey = data.generateKeyPair()
     epubkey = data.encode64(epubkey:serialize())
     eprkey = data.encode64(eprkey:serialize())
-    local iv = data.random(AES_IV_SIZE)
+    local iv = data.encode64(data.random(AES_IV_SIZE))
     peersTable[epubkey] = iv
 
     if not files.writeBinary(PEERS_TABLE_FILE, serialization.serialize(peersTable)) then
@@ -59,9 +60,9 @@ local function run()
     -- B64 encoding is not for security (obviously it's no more secure), but
     -- rather just so that the key is in plaintext.
     local addedCode = "-- " .. epubkey .. "\n"
-    addedCode = addedCode .. "local spubkey = \"" .. data.encode64(spubkey) .. "\"\n"
+    addedCode = addedCode .. "local spubkey = \"" .. spubkey .. "\"\n"
     addedCode = addedCode .. "local eprkey = \"" .. eprkey .. "\"\n"
-    addedCode = addedCode .. "local iv = \"" .. data.encode64(iv) .. "\"\n"
+    addedCode = addedCode .. "local iv = \"" .. iv .. "\"\n"
     bios = addedCode .. bios
 
     print("Attempting to write " .. bios:len() .. " bytes...")
