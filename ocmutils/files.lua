@@ -1,3 +1,4 @@
+component = require("component")
 filesystem = require("filesystem")
 
 local files = {}
