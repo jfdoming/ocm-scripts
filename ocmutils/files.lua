@@ -1,7 +1,5 @@
 filesystem = require("filesystem")
 
-crypto = require("ocmutils.crypto")
-
 local files = {}
 
 files.PUBKEY_PATH = "/.pubkey"
@@ -77,9 +75,10 @@ files.sign = function(path, prkey)
         if prkey == nil then
             return false
         end
+        prkey = component.data.deserializeKey(prkey, "ec-private")
     end
 
-    local sig = crypto.sig(data, prkey)
+    local sig = component.data.ecdsa(data, prkey)
     if sig == nil then
         return false
     end
@@ -101,6 +100,7 @@ files.encryptAndSignAll = function(sourceDir, epubkey, iv)
     if sprkey == nil then
         return false
     end
+    sprkey = component.data.deserializeKey(sprkey)
 
     local shkey = component.data.ecdh(sprkey, epubkey)
     if shkey == nil then
