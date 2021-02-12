@@ -51,7 +51,7 @@ local function run()
     local iv = data.random(AES_IV_SIZE)
     peersTable[epubkey] = iv
 
-    if not files.writeBinary(PEERS_TABLE_FILE, serialization.serialize(eepromTable)) then
+    if not files.writeBinary(PEERS_TABLE_FILE, serialization.serialize(peersTable)) then
         io.stderr:write("Failed to write peers table.\n")
         return 1
     end
@@ -64,6 +64,7 @@ local function run()
     addedCode = addedCode .. "local iv = \"" .. data.encode64(iv) .. "\"\n"
     bios = addedCode .. bios
 
+    print("Attempting to write " .. bios:len() .. " bytes...")
     local _, err = eeprom.set(bios)
     if err ~= nil then
         io.stderr:write("Error: " .. err .. "\n")

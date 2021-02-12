@@ -3,7 +3,7 @@ local fs = component.list("filesystem")
 local eeprom = component.proxy(component.list("eeprom")())
 
 local screen = component.list("screen")()
-local gpu, w, h = nil, nil, nil
+local gpu, w, h
 if screen ~= nil then
     gpu = component.proxy(component.list("gpu")())
     gpu.bind(screen)
@@ -12,7 +12,9 @@ if screen ~= nil then
 end
 
 local printy = 1
-local function _write(s)
+local function _write(s, c)
+    if gpu == nil then return false end
+    gpu.setForeground(c)
     if s == nil then s = "nil\n" end
     if s:sub(-1) ~= "\n" then
         s = s .. "\n"
@@ -27,18 +29,8 @@ local function _write(s)
         end
     end
 end
-function print(s)
-    if gpu == nil then return false end
-    gpu.setForeground(0xFFFFFF)
-    _write(s)
-    return true
-end
-function printerr(s)
-    if gpu == nil then return false end
-    gpu.setForeground(0xFF0000)
-    _write(s)
-    return true
-end
+function print(s) return _write(s, 0xFFFFFF) end
+function printerr(s) return _write(s, 0xFF0000) end
 function clear()
     if gpu == nil then return false end
     gpu.setForeground(0xFFFFFF)
