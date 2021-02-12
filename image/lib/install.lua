@@ -137,7 +137,7 @@ local function run(arg)
         io.stderr:write("EEPROM metadata corrupted.")
         return 1
     end
-    epubkey = component.data.deserializeKey(epubkey)
+    epubkey = component.data.deserializeKey(epubkey, "ec-public")
 
     -- Copy over the image files.
     print("Installing image...")
