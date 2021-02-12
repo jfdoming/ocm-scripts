@@ -49,7 +49,7 @@ files.writeBinary = function(path, data)
     return result
 end
 
-files.encrypt = function(source, shkey)
+files.encrypt = function(source, shkey, iv)
     if not files.isPlainFile(source) then
         return false
     end
