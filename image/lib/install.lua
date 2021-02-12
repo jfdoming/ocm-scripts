@@ -104,16 +104,6 @@ local function run(arg)
     ---- Done argument acquisition. ----
 
 
-    -- Enable write protection.
-    print("Enabling write protection...")
-    file = io.open(chosenFS .. IMAGE_WRITE_PROTECTION_FILE, "w")
-    if file == nil then
-        io.stderr:write("Failed to open file, aborting...\n")
-        return 1
-    end
-    file:close()
-    print("Write protection enabled.")
-
     -- Determine peer pubkey.
     local peerTable = files.readBinary(PEERS_TABLE_FILE)
     if peerTable == nil then
@@ -129,15 +119,34 @@ local function run(arg)
     local eepromData = component.eeprom.get()
     local epubkey = eepromData:sub(4, eepromData:find("\n") - 1)
     if epubkey == nil or epubkey == "" then
-        io.stderr:write("EEPROM metadata corrupted.")
+        if component.eeprom.getLabel():lower():find("lua") == nil then
+            io.stderr:write("EEPROM metadata corrupted.")
+        else
+            io.stderr:write("EEPROM metadata corrupted. Perhaps you left in the wrong EEPROM?")
+        end
         return 1
     end
     local iv = peerTable[epubkey]
     if iv == nil then
-        io.stderr:write("EEPROM metadata corrupted.")
+        if component.eeprom.getLabel():lower():find("lua") == nil then
+            io.stderr:write("EEPROM metadata corrupted.")
+        else
+            io.stderr:write("EEPROM metadata corrupted. Perhaps you left in the wrong EEPROM?")
+        end
         return 1
     end
+    epubkey = component.data.decode64(epubkey)
     epubkey = component.data.deserializeKey(epubkey, "ec-public")
+
+    -- Enable write protection.
+    print("Enabling write protection...")
+    file = io.open(chosenFS .. IMAGE_WRITE_PROTECTION_FILE, "w")
+    if file == nil then
+        io.stderr:write("Failed to open file, aborting...\n")
+        return 1
+    end
+    file:close()
+    print("Write protection enabled.")
 
     -- Copy over the image files.
     print("Installing image...")
