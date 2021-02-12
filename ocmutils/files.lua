@@ -101,7 +101,7 @@ files.encryptAndSignAll = function(sourceDir, epubkey, iv)
     if sprkey == nil then
         return false
     end
-    sprkey = component.data.deserializeKey(sprkey)
+    sprkey = component.data.deserializeKey(sprkey, "ec-private")
 
     local shkey = component.data.ecdh(sprkey, epubkey)
     if shkey == nil then
