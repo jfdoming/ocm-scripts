@@ -1,15 +1,16 @@
 local component = require("component")
 local computer = require("computer")
-local sides = require("sides")
 local robot = component.proxy(component.list("robot")())
 local inv = component.proxy(component.list("inventory_controller")())
 local gen = component.proxy(component.list("generator")())
 local chunk = component.proxy(component.list("chunkloader")())
 
+local sides = {bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5}
+
 local width, height, depth = 16, 9, 16
 local xPos, yPos, zPos = 0, 0, 0
 local xDir, zDir = 0, 1
-local chestSide = sides.front
+local chestSide = sides.bottom
 local checkDura = false
 
 local function turnRight()
@@ -22,11 +23,6 @@ local function turnLeft()
 	xDir, zDir = -zDir, xDir
 end
 
-local function turnAround()
-	turnLeft()
-	turnLeft()
-end
-
 local function rotate(xd, zd)
 	while zDir ~= zd or xDir ~= xd do
 		turnLeft()
@@ -36,7 +32,6 @@ end
 -- Places Ender Chest
 -- Postcondition: Ender Chest is above robot, Pickaxe is in slot 1
 local function placeChest()
-	turnAround()
 	while robot.detect(chestSide) do
 		robot.swing(chestSide)
 	end
@@ -52,7 +47,6 @@ local function breakChest()
 	while robot.detect(chestSide) do
 		robot.swing(chestSide)
 	end
-	turnAround()
 end
 
 -- Gives the index of the first free inv slot
@@ -182,7 +176,7 @@ local function digUpDown()
 end
 
 local function digTowards(x, y)
-	if robot.durability < 0.01 then
+	if robot.durability() < 0.01 then
 		checkDura = true
 	else
 		checkDura = false
