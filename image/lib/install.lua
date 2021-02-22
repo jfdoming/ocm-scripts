@@ -1,11 +1,15 @@
+local component = require("component")
 local filesystem = require("filesystem")
+local serialization = require("serialization")
+
 local files = require("ocmutils.files")
 local input = require("ocmutils.input")
 
 local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
-local IMAGE_BOOT_FILE = "init.lua"
+local IMAGE_BOOT_FILE = "/usr/share/image/image_init.lua"
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
+local PEERS_TABLE_FILE = "/.peers"
 
 
 local function run(arg)
@@ -100,6 +104,43 @@ local function run(arg)
     ---- Done argument acquisition. ----
 
 
+    -- Determine peer pubkey.
+    local peerTable = files.readBinary(PEERS_TABLE_FILE)
+    if peerTable == nil then
+        io.stderr:write("Failed to read peer table.\n")
+        return 1
+    else
+        peerTable = serialization.unserialize(peerTable)
+    end
+    if component.eeprom == nil then
+        io.stderr:write("No EEPROM present.\n")
+        return 1
+    end
+    local eepromData = component.eeprom.get()
+    local epubkey = eepromData:sub(4, eepromData:find("\n") - 1)
+    if epubkey == nil or epubkey == "" then
+        if component.eeprom.getLabel():lower():find("lua") == nil then
+            io.stderr:write("EEPROM metadata corrupted.")
+        else
+            io.stderr:write("EEPROM metadata corrupted. Perhaps you left in the wrong EEPROM?")
+        end
+        return 1
+    end
+
+    local iv = peerTable[epubkey]
+    if iv == nil then
+        if component.eeprom.getLabel():lower():find("lua") == nil then
+            io.stderr:write("EEPROM metadata corrupted.")
+        else
+            io.stderr:write("EEPROM metadata corrupted. Perhaps you left in the wrong EEPROM?")
+        end
+        return 1
+    end
+
+    epubkey = component.data.decode64(epubkey)
+    epubkey = component.data.deserializeKey(epubkey, "ec-public")
+    iv = component.data.decode64(iv)
+
     -- Enable write protection.
     print("Enabling write protection...")
     file = io.open(chosenFS .. IMAGE_WRITE_PROTECTION_FILE, "w")
@@ -112,10 +153,11 @@ local function run(arg)
 
     -- Copy over the image files.
     print("Installing image...")
-    files.copy(files.PUBKEY_PATH, chosenFS)
     files.copy(chosenImage, chosenFS)
-    if not files.sign(chosenFS .. IMAGE_BOOT_FILE) then
-        io.stderr:write("Warning: Failed to sign some files in the image. Your image may not boot correctly.\n")
+    files.copy(IMAGE_BOOT_FILE, chosenFS)
+    if not files.encryptAndSignAll(chosenFS, epubkey, iv) then
+        io.stderr:write("Error: Failed to sign some files in the image. Your image may not boot correctly.\n")
+        return 1
     end
     print("Image installed.")
 

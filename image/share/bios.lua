@@ -1,10 +1,9 @@
 local data = component.proxy(component.list("data")())
 local fs = component.list("filesystem")
 local eeprom = component.proxy(component.list("eeprom")())
-local invoke = component.invoke
 
 local screen = component.list("screen")()
-local gpu, w, h = nil, nil, nil
+local gpu, w, h
 if screen ~= nil then
     gpu = component.proxy(component.list("gpu")())
     gpu.bind(screen)
@@ -13,10 +12,14 @@ if screen ~= nil then
 end
 
 local printy = 1
-local function _write(s)
+local function _write(s, c)
+    if gpu == nil then return false end
+    gpu.setForeground(c)
+    if s == nil then s = "nil\n" end
     if s:sub(-1) ~= "\n" then
         s = s .. "\n"
     end
+
     s = s:gsub("%\t", "        ")
     for l in s:gmatch("(.-)\n") do
         while l ~= "" do
@@ -26,29 +29,10 @@ local function _write(s)
         end
     end
 end
-function print(s)
-    if gpu == nil then
-        return false
-    end
-
-    gpu.setForeground(0xFFFFFF)
-    _write(s)
-    return true
-end
-function printerr(s)
-    if gpu == nil then
-        return false
-    end
-
-    gpu.setForeground(0xFF0000)
-    _write(s)
-    return true
-end
+function print(s) return _write(s, 0xFFFFFF) end
+function printerr(s) return _write(s, 0xFF0000) end
 function clear()
-    if gpu == nil then
-        return false
-    end
-
+    if gpu == nil then return false end
     gpu.setForeground(0xFFFFFF)
     gpu.setBackground(0x000000)
     gpu.fill(1, 1, w, h, " ")
@@ -61,49 +45,62 @@ computer.getBootAddress = eeprom.getData
 computer.setBootAddress = eeprom.setData
 
 local function isPlainFile(f, p)
-    return invoke(f, "exists", p) and not invoke(f, "isDirectory", p)
+    return f.exists(p) and not f.isDirectory(p)
 end
 
-local function sig(f)
-    if not isPlainFile(f, "/init.lua.sig") then
-        return nil
-    end
-    local handle = invoke(f, "open", "/init.lua.sig")
-    local sig = invoke(f, "read", handle, math.huge)
-    invoke(f, "close", handle)
+local function sig(f, path)
+    path = path .. ".sig"
+    if not isPlainFile(f, path) then return nil end
+    local handle = f.open(path)
+    local sig = f.read(handle, math.huge)
+    f.close(handle)
     return sig
 end
 
 
-local function boot(f)
-    local sg = sig(f)
+function exec(path)
+    path = path .. ".bin"
+    local f = component.proxy(computer.getBootAddress())
+    local sg = sig(f, path)
     if sg == nil then
-        print("Skipping image due to missing signature.")
+        print("Skipping due to missing signature.")
         return false
     end
 
-    computer.setBootAddress(f)
-    local handle = invoke(f, "open", "/init.lua")
+    local handle = f.open(path)
     local code = ""
     repeat
-        local chunk = invoke(f, "read", handle, math.huge)
+        local chunk = f.read(handle, math.huge)
         code = code .. (chunk or "")
     until not chunk
-    invoke(f, "close", handle)
+    f.close(handle)
 
-    if not data.ecdsa(code, pk, sg) then
-        print("Skipping image due to bad signature.")
+    if not data.ecdsa(code, spubkey, sg) then
+        print("Skipping due to bad signature.")
         return false
     end
 
+    code = data.decrypt(code, shkey, iv)
+
+    local result, what = load(code)
+    if result == nil then
+        print("Skipping due to invalid code.")
+        return false
+    end
+    return xpcall(result, debug.traceback)
+end
+
+local function boot(f)
+    computer.setBootAddress(f)
     computer.beep(440, 0.5)
     clear()
-    result, what = load(code)
+    result, what = exec("/image_init.lua")
+    if result == false then return false end
     if result == nil then
         print("Skipping image due to invalid code.")
         return false
     end
-    result, err = xpcall(result, debug.traceback)
+    local result, err = xpcall(result, debug.traceback)
     if err == nil then
         printerr("Error: Do not return from an image entrypoint!")
     else
@@ -116,20 +113,22 @@ local function boot(f)
     return true
 end
 
-if pubkey ~= nil then
-    pubkey = data.deserializeKey(data.decode64(pubkey), "ec-public")
+if spubkey ~= nil and eprkey ~= nil and iv ~= nil then
+    spubkey = data.deserializeKey(data.decode64(spubkey), "ec-public")
+    eprkey = data.deserializeKey(data.decode64(eprkey), "ec-private")
+    iv = data.decode64(iv)
+    local shkey = data.ecdh(eprkey, spubkey):sub(8, 23)
+    eprkey = nil
 end
 
-if pubkey == nil then
-    printerr("Invalid public key.")
+if shkey == nil then
+    printerr("Invalid keypair.")
 else
     local found = false
     for f, _ in pairs(fs) do
-        if isPlainFile(f, "/init.lua") then
+        if isPlainFile(f, "/image_init.lua.bin") then
             print("Located image to load.")
-            if boot(f) then
-                found = true
-            end
+            if boot(f) then found = true end
             break
         end
     end

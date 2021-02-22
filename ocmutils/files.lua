@@ -1,11 +1,11 @@
+component = require("component")
 filesystem = require("filesystem")
-
-crypto = require("ocmutils.crypto")
 
 local files = {}
 
 files.PUBKEY_PATH = "/.pubkey"
 files.PRKEY_PATH = "/.prkey"
+files.BIN_SUFFIX = ".bin"
 files.SIG_SUFFIX = ".sig"
 
 files.isPlainFile = function(path)
@@ -49,18 +49,38 @@ files.writeBinary = function(path, data)
     return result
 end
 
-files.sign = function(path)
+files.encrypt = function(path, shkey, iv)
     local data = files.readBinary(path)
     if data == nil then
         return false
     end
 
-    local prkey = files.readBinary(files.PRKEY_PATH)
-    if prkey == nil then
+    if shkey == nil or iv == nil then
         return false
     end
 
-    local sig = crypto.sig(data, prkey)
+    local encrypted = component.data.encrypt(data, shkey, iv)
+    if encrypted == nil then
+        return false
+    end
+    return files.writeBinary(path .. files.BIN_SUFFIX, encrypted)
+end
+
+files.sign = function(path, prkey)
+    local data = files.readBinary(path)
+    if data == nil then
+        return false
+    end
+
+    if prkey == nil then
+        prkey = files.readBinary(files.PRKEY_PATH)
+        if prkey == nil then
+            return false
+        end
+        prkey = component.data.deserializeKey(prkey, "ec-private")
+    end
+
+    local sig = component.data.ecdsa(data, prkey)
     if sig == nil then
         return false
     end
@@ -68,5 +88,62 @@ files.sign = function(path)
     local sigpath = path .. files.SIG_SUFFIX
     return files.writeBinary(sigpath, sig)
 end
+
+files.encryptAndSignAll = function(sourceDir, epubkey, iv)
+    if not files.isPlainDirectory(sourceDir) then
+        return false
+    end
+
+    if epubkey == nil then
+        return false
+    end
+
+    local sprkey = files.readBinary(files.PRKEY_PATH)
+    if sprkey == nil then
+        return false
+    end
+    sprkey = component.data.deserializeKey(sprkey, "ec-private")
+
+    local shkey = component.data.ecdh(sprkey, epubkey)
+    if shkey == nil then
+        return false
+    end
+
+    -- Unfortunately, this AES implementation only takes 128-bit keys.
+    -- Choose a substring of the generated key as our shared key.
+    shkey = shkey:sub(8, 23)
+
+    if string.sub(sourceDir, -1) ~= "/" then
+        sourceDir = sourceDir .. "/"
+    end
+
+    local queue = {first = 1, curr = 2}
+    queue[1] = sourceDir
+    while queue.first < queue.curr do
+        curr = queue[queue.first]
+        queue.first = queue.first + 1
+        for file in filesystem.list(curr) do
+            file = curr .. file
+            if files.isPlainDirectory(file) then
+                queue[queue.curr] = file
+                queue.curr = queue.curr + 1
+            elseif files.isPlainFile(file) then
+                if string.sub(file, -4, -1) == ".lua" then
+                    if not files.encrypt(file, shkey, iv) then
+                        return false
+                    end
+                    filesystem.remove(file)
+                    file = file .. files.BIN_SUFFIX
+                end
+                if not files.sign(file, sprkey) then
+                    return false
+                end
+            end
+        end
+    end
+
+    return true
+end
+
 
 return files
