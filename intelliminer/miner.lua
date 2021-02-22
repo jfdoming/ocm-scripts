@@ -1,5 +1,3 @@
-local component = require("component")
-local computer = require("computer")
 local robot = component.proxy(component.list("robot")())
 local inv = component.proxy(component.list("inventory_controller")())
 local gen = component.proxy(component.list("generator")())
@@ -7,11 +5,13 @@ local chunk = component.proxy(component.list("chunkloader")())
 
 local sides = {bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5}
 
-local width, height, depth = 16, 9, 16
+local width, height, depth = 16, 16, 8192
 local xPos, yPos, zPos = 0, 0, 0
 local xDir, zDir = 0, 1
 local chestSide = sides.bottom
 local checkDura = false
+
+local p = 0
 
 local function turnRight()
 	robot.turn(true)
@@ -36,7 +36,13 @@ local function placeChest()
 		robot.swing(chestSide)
 	end
 	inv.equip()
-	while not robot.use(chestSide) do end
+	robot.use(chestSide)
+
+	p = 0
+	while not robot.detect(chestSide) do
+		robot.move(chestSide)
+		p = p + 1
+	end
 end
 
 -- Breaks Ender Chest
@@ -46,6 +52,11 @@ local function breakChest()
 	inv.equip()
 	while robot.detect(chestSide) do
 		robot.swing(chestSide)
+	end
+
+	while p > 0 do
+		robot.move(sides.top)
+		p = p - 1
 	end
 end
 
