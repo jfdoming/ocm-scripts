@@ -1,5 +1,6 @@
-component = require("component")
-filesystem = require("filesystem")
+local component = require("component")
+local filesystem = require("filesystem")
+local os = require("os")
 
 local files = {}
 
@@ -44,45 +45,68 @@ files.writeBinary = function(path, data)
     if file == nil then
         return nil
     end
-    local result = file:write(data)
+    file:write(data)
     file:close()
-    return result
+    return true
 end
 
 files.encrypt = function(path, shkey, iv)
     local data = files.readBinary(path)
     if data == nil then
-        return false
+        return false, "Invalid path."
     end
 
     if shkey == nil or iv == nil then
-        return false
+        return false, "Invalid key or IV."
     end
 
-    local encrypted = component.data.encrypt(data, shkey, iv)
-    if encrypted == nil then
-        return false
+    -- Retry a couple of times to try to work around power restrictions.
+    local tries = 3
+    local encrypted, what = nil, nil
+    while tries > 0 do
+        tries = tries - 1
+        encrypted, what = component.data.encrypt(data, shkey, iv)
+        if encrypted ~= nil then break end
+        if what ~= "not enough energy" then
+            return false, what
+        end
+        if tries > 0 then os.sleep(1) end
     end
+    if encrypted == nil then
+        return false, what
+    end
+
     return files.writeBinary(path .. files.BIN_SUFFIX, encrypted)
 end
 
 files.sign = function(path, prkey)
     local data = files.readBinary(path)
     if data == nil then
-        return false
+        return false, "Invalid path."
     end
 
     if prkey == nil then
         prkey = files.readBinary(files.PRKEY_PATH)
         if prkey == nil then
-            return false
+            return false, "Invalid private key."
         end
         prkey = component.data.deserializeKey(prkey, "ec-private")
     end
 
-    local sig = component.data.ecdsa(data, prkey)
+    -- Retry a couple of times to try to work around power restrictions.
+    local tries = 3
+    local sig, what = nil, nil
+    while tries > 0 do
+        tries = tries - 1
+        sig, what = component.data.ecdsa(data, prkey)
+        if sig ~= nil then break end
+        if what ~= "not enough energy" then
+            return false, what
+        end
+        if tries > 0 then os.sleep(1) end
+    end
     if sig == nil then
-        return false
+        return false, what
     end
 
     local sigpath = path .. files.SIG_SUFFIX
@@ -91,22 +115,22 @@ end
 
 files.encryptAndSignAll = function(sourceDir, epubkey, iv)
     if not files.isPlainDirectory(sourceDir) then
-        return false
+        return false, "Invalid source directory."
     end
 
     if epubkey == nil then
-        return false
+        return false, "No public key."
     end
 
     local sprkey = files.readBinary(files.PRKEY_PATH)
     if sprkey == nil then
-        return false
+        return false, "Bad private key."
     end
     sprkey = component.data.deserializeKey(sprkey, "ec-private")
 
     local shkey = component.data.ecdh(sprkey, epubkey)
     if shkey == nil then
-        return false
+        return false, "Bad shared key."
     end
 
     -- Unfortunately, this AES implementation only takes 128-bit keys.
@@ -129,14 +153,17 @@ files.encryptAndSignAll = function(sourceDir, epubkey, iv)
                 queue.curr = queue.curr + 1
             elseif files.isPlainFile(file) then
                 if string.sub(file, -4, -1) == ".lua" then
-                    if not files.encrypt(file, shkey, iv) then
-                        return false
+                    local result, what = files.encrypt(file, shkey, iv)
+                    if not result then
+                        return result, what
                     end
                     filesystem.remove(file)
                     file = file .. files.BIN_SUFFIX
                 end
-                if not files.sign(file, sprkey) then
-                    return false
+
+                local result, what = files.sign(file, sprkey)
+                if not result then
+                    return result, what
                 end
             end
         end

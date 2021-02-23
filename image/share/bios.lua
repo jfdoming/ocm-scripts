@@ -1,3 +1,5 @@
+local shkey = nil
+
 local data = component.proxy(component.list("data")())
 local fs = component.list("filesystem")
 local eeprom = component.proxy(component.list("eeprom")())
@@ -15,10 +17,8 @@ local printy = 1
 local function _write(s, c)
     if gpu == nil then return false end
     gpu.setForeground(c)
-    if s == nil then s = "nil\n" end
-    if s:sub(-1) ~= "\n" then
-        s = s .. "\n"
-    end
+    s = tostring(s)
+    if s:sub(-1) ~= "\n" then s = s .. "\n" end
 
     s = s:gsub("%\t", "        ")
     for l in s:gmatch("(.-)\n") do
@@ -51,7 +51,7 @@ end
 local function sig(f, path)
     path = path .. ".sig"
     if not isPlainFile(f, path) then return nil end
-    local handle = f.open(path)
+    local handle = f.open(path, "rb")
     local sig = f.read(handle, math.huge)
     f.close(handle)
     return sig
@@ -62,32 +62,29 @@ function exec(path)
     path = path .. ".bin"
     local f = component.proxy(computer.getBootAddress())
     local sg = sig(f, path)
-    if sg == nil then
-        print("Skipping due to missing signature.")
-        return false
-    end
+    if sg == nil then return false, "Missing signature." end
 
-    local handle = f.open(path)
+    local fd = f.open(path, "rb")
     local code = ""
     repeat
-        local chunk = f.read(handle, math.huge)
-        code = code .. (chunk or "")
-    until not chunk
-    f.close(handle)
+        local pt = f.read(fd, math.huge)
+        code = code .. (pt or "")
+    until not pt
+    f.close(fd)
 
-    if not data.ecdsa(code, spubkey, sg) then
-        print("Skipping due to bad signature.")
-        return false
-    end
-
-    code = data.decrypt(code, shkey, iv)
+    if not data.ecdsa(code, spubkey, sg) then return false, "Bad signature." end
+    code, what = data.decrypt(code, shkey, iv)
+    if code == nil then return false, what end
 
     local result, what = load(code)
-    if result == nil then
-        print("Skipping due to invalid code.")
-        return false
+    if result == nil then return false, "Invalid code." end
+
+    local success, retval = xpcall(result, debug.traceback)
+    if success then
+        return retval
+    else
+        return false, retval
     end
-    return xpcall(result, debug.traceback)
 end
 
 local function boot(f)
@@ -95,20 +92,11 @@ local function boot(f)
     computer.beep(440, 0.5)
     clear()
     result, what = exec("/image_init.lua")
-    if result == false then return false end
-    if result == nil then
-        print("Skipping image due to invalid code.")
-        return false
-    end
-    local result, err = xpcall(result, debug.traceback)
-    if err == nil then
+    if what == nil then
         printerr("Error: Do not return from an image entrypoint!")
     else
-        printerr("Image crashed! Details:")
-        printerr(err)
-        if gpu == nil then
-            error(err)
-        end
+        printerr("Image crashed! Details:") printerr(what)
+        if gpu == nil then error(what) end
     end
     return true
 end
@@ -116,25 +104,20 @@ end
 if spubkey ~= nil and eprkey ~= nil and iv ~= nil then
     spubkey = data.deserializeKey(data.decode64(spubkey), "ec-public")
     eprkey = data.deserializeKey(data.decode64(eprkey), "ec-private")
-    iv = data.decode64(iv)
-    local shkey = data.ecdh(eprkey, spubkey):sub(8, 23)
+    iv, shkey = data.decode64(iv), data.ecdh(eprkey, spubkey):sub(8, 23)
     eprkey = nil
 end
 
-if shkey == nil then
-    printerr("Invalid keypair.")
-else
+if shkey == nil then printerr("Invalid keypair.") else
     local found = false
     for f, _ in pairs(fs) do
-        if isPlainFile(f, "/image_init.lua.bin") then
+        if isPlainFile(component.proxy(f), "/image_init.lua.bin") then
             print("Located image to load.")
             if boot(f) then found = true end
             break
         end
     end
-    if not found then
-        print("No valid images found.")
-    end
+    if not found then print("No valid images found.") end
 end
 
 while true do coroutine.yield() end
