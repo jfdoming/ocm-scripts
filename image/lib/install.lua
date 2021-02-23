@@ -7,7 +7,9 @@ local input = require("ocmutils.input")
 
 local DEFAULT_IMAGE_SEARCH_PATH = "/usr/share/image/" -- Must end with "/".
 local IMAGE_WRITE_PROTECTION_FILE = ".writeprotect"
-local IMAGE_BOOT_FILE = "/usr/share/image/image_init.lua"
+local IMAGE_CHECKSUM_FILE = ".checksum.lua"
+local IMAGE_BASE_FILE = "base/"
+local IMAGE_BASE_PATH = "/usr/share/image/" .. IMAGE_BASE_FILE .. "." -- Must end with "/."
 local IMAGE_POST_INSTALL_FILE = "postInstall.lua"
 local PEERS_TABLE_FILE = "/.peers"
 
@@ -62,7 +64,7 @@ local function run(arg)
         directories = {}
         directoryLabels = {}
         for file in fileEntries do
-            if filesystem.isDirectory(DEFAULT_IMAGE_SEARCH_PATH .. file) then
+            if filesystem.isDirectory(DEFAULT_IMAGE_SEARCH_PATH .. file) and file ~= IMAGE_BASE_FILE then
                 directories[#directories + 1] = file
                 directoryLabels[#directoryLabels + 1] = "Image \"" .. filesystem.name(file) .. "\""
             end
@@ -112,8 +114,8 @@ local function run(arg)
     else
         peerTable = serialization.unserialize(peerTable)
     end
-    if component.eeprom == nil then
-        io.stderr:write("No EEPROM present.\n")
+    if component.list("eeprom")() == nil then
+        io.stderr:write("No EEPROM present. Insert an EEPROM you want to bind this image to and try again.\n")
         return 1
     end
     local eepromData = component.eeprom.get()
@@ -151,12 +153,28 @@ local function run(arg)
     file:close()
     print("Write protection enabled.")
 
+    -- Save the checksum.
+    print("Saving checksum...")
+    file = io.open(chosenFS .. IMAGE_CHECKSUM_FILE, "w")
+    if file == nil then
+        io.stderr:write("Failed to open file, aborting...\n")
+        return 1
+    end
+    file:write("return \"" .. component.eeprom.getChecksum() .. "\"\n")
+    file:close()
+    print("Checksum saved.")
+
     -- Copy over the image files.
     print("Installing image...")
     files.copy(chosenImage, chosenFS)
-    files.copy(IMAGE_BOOT_FILE, chosenFS)
-    if not files.encryptAndSignAll(chosenFS, epubkey, iv) then
+    files.copy(IMAGE_BASE_PATH, chosenFS)
+    local result, what = files.encryptAndSignAll(chosenFS, epubkey, iv)
+    if not result then
         io.stderr:write("Error: Failed to sign some files in the image. Your image may not boot correctly.\n")
+        if what then
+            io.stderr:write("Message: " .. what .. "\n")
+        end
+        print(result, what)
         return 1
     end
     print("Image installed.")
