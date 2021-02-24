@@ -2,6 +2,7 @@ local robot = component.proxy(component.list("robot")())
 local inv = component.proxy(component.list("inventory_controller")())
 local gen = component.proxy(component.list("generator")())
 local chunk = component.proxy(component.list("chunkloader")())
+local debug = component.proxy(component.list("debug")())
 
 local sides = {bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5}
 
@@ -73,14 +74,14 @@ end
 
 -- Check fuel level and refuel if low
 local function refuel()
-	if gen.count() == 0 then
+	if gen.count() < 32 then
 		local noCoal = true
 		for i=2, 16 do
 			local item = inv.getStackInInternalSlot(i)
 			if item ~= nil and item.label == "Coal" then
 				noCoal = false
 				robot.select(i)
-				gen.insert(math.min(robot.count(), 64 - gen.count()))
+				gen.insert(math.min(item.size, 64 - gen.count()))
 				break
 			end
 		end
@@ -96,7 +97,7 @@ local function refuel()
 				local item = inv.getStackInSlot(chestSide, i)
 				if item ~= nil and item.label == "Coal" then
 					robot.select(firstFreeSlot())
-					inv.suckFromSlot(chestSide, i, math.min(robot.count(), 64 - gen.count()))
+					inv.suckFromSlot(chestSide, i, math.min(item.size, 64 - gen.count()))
 					gen.insert(robot.count())
 					break
 				end
@@ -261,7 +262,7 @@ local function digTowards(x, y)
 end
 
 local function main()
-	if chunk.isActive() then
+	if not chunk.isActive() then
 		chunk.setActive(true)
 	end
 
@@ -269,7 +270,7 @@ local function main()
 
     local path = generatePath(width, height)
     while zPos < depth do
-		if computer.energy() / computer.maxEnergy() < 0.1 then
+		if computer.energy() / computer.maxEnergy() < 0.15 then
 			refuel()
 		end
 
