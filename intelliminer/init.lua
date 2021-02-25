@@ -72,7 +72,7 @@ end
 
 local function checkState(flags)
 	if flags:match("T") ~= nil then
-		if robot.durability() < 0.0012 then
+		if robot.durability() < 0.003 then
 			placeChest()
 			robot.drop(chestSide, robot.count())
 	
@@ -100,7 +100,7 @@ local function checkState(flags)
 	end
 
 	if flags:match("F") ~= nil then
-		if gen.count() < 32 then
+		if gen.count() < 31 then
 			local noCoal = true
 			for i=2, 16 do
 				local item = inv.getStackInInternalSlot(i)
