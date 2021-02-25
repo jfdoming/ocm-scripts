@@ -2,15 +2,12 @@ local robot = component.proxy(component.list("robot")())
 local inv = component.proxy(component.list("inventory_controller")())
 local gen = component.proxy(component.list("generator")())
 local chunk = component.proxy(component.list("chunkloader")())
-
 local sides = {bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5}
-
 local width, height, depth = 16, 16, 8192
 local xPos, yPos, zPos = 0, 0, 0
 local xDir, zDir = 0, 1
 local chestSide = sides.bottom
 local chestPlaced = false
-
 local p = 0
 
 local function turnRight()
@@ -27,6 +24,13 @@ local function rotate(xd, zd)
 	while zDir ~= zd or xDir ~= xd do
 		turnLeft()
 	end
+end
+
+local function firstFreeSlot()
+	for i=2,16 do
+		if robot.count(i) == 0 then return i end
+	end
+	return nil
 end
 
 local function placeChest()
@@ -67,7 +71,6 @@ local function breakChest()
 end
 
 local function checkState(flags)
-	-- Check tool durability
 	if flags:match("T") ~= nil then
 		if robot.durability() < 0.0012 then
 			placeChest()
@@ -83,7 +86,6 @@ local function checkState(flags)
 		end
 	end
 
-	-- Check for full inventory
 	if flags:match("I") ~= nil then
 		if firstFreeSlot() == nil then
 			placeChest()
@@ -97,7 +99,6 @@ local function checkState(flags)
 		end
 	end
 
-	-- Check fuel level and refuel
 	if flags:match("F") ~= nil then
 		if gen.count() < 32 then
 			local noCoal = true
@@ -139,16 +140,6 @@ local function dig(s)
 	end
 end
 
-local function firstFreeSlot()
-	for i=2,16 do
-		if robot.count(i) == 0 then
-			return i
-		end
-	end
-	return nil
-end
-
--- Generates graph representing digging pattern
 local function generatePath(w, h)
 	local path = {}
 	local last = math.fmod(math.ceil(h/3), 2) == 0 and {x=0, y=h-2} or {x=w-1, y=h-2}
@@ -230,6 +221,8 @@ local function main()
 	if not chunk.isActive() then
 		chunk.setActive(true)
 	end
+
+	checkState("F")
 
     local path = generatePath(width, height)
     while zPos < depth do
