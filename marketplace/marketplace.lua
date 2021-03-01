@@ -52,6 +52,20 @@ local function _protectedSection(key, fn, ...)
     return result, err
 end
 
+local function _mergeTypes(tr, side)
+    for i=1, tr.getInventorySize(side) - 1 do
+        for j=2, tr.getInventorySize(side) do
+            local stackA, stackB = tr.getStackInSlot(side, i), tr.getStackInSlot(side, j)
+
+            if stackA and stackB and tr.compareStacks(side, i, j, true) then
+                if stackA.size ~= stackA.maxSize and stackB.size ~= stackB.maxSize then
+                    local count = math.min(stackA.maxSize - stackA.size, stackB.size)
+                    tr.transferItem(side, side, count, j, i)
+                end
+            end
+        end
+    end
+end
 
 -- Logic component.
 function marketplace.logic.getSourceSide(side)
