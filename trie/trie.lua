@@ -9,7 +9,7 @@ end
 
 function class:set(key, value)
     local current = self.root
-    local iterator = key:gmatch"."
+    local iterator = key:gmatch(".")
     for ch in iterator do
         local child = current.children[ch]
         if child == nil then
