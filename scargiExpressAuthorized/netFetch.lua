@@ -1,5 +1,6 @@
 local component = require("component")
 local event = require("event")
+local serialization = require("serialization")
 
 local arg = {...}
 
@@ -32,7 +33,13 @@ if requestCount ~= nil then
     end
 end
 
-component.tunnel.send(requestName, requestCount)
+-- Since we're connected via linked card, we need to provide the "meta" field manually.
+meta = {
+    trusted = true,
+}
+
+print("Requesting items...")
+component.tunnel.send(serialization.serialize(meta), requestName, requestCount)
 
 while true do
     local _1, receiver, _2, _3, _4, result, err = event.pull("modem_message")
