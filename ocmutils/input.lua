@@ -1,6 +1,9 @@
+local filesystem = require("filesystem")
+local files = require("ocmutils.files")
+
 local input = {}
 
-input.confirm = function(prompt, yesAnswer)
+function input.confirm(prompt, yesAnswer)
     if prompt == nil then
         prompt = "Are you sure you want to continue? "
     end
@@ -27,7 +30,7 @@ input.confirm = function(prompt, yesAnswer)
     return false
 end
 
-input.getFromList = function(list, listStrings, name, first)
+function input.getFromList(list, listStrings, name, first)
     if #list == 0 then
         return false
     end
@@ -64,6 +67,56 @@ input.getFromList = function(list, listStrings, name, first)
 
     print()
     return list[number]
+end
+
+function input.getFilesystem()
+    mounts = filesystem.mounts()
+    fileEntries = {}
+    fileLabels = {}
+    for node, mount in mounts do
+        local label = node.getLabel()
+        if label == nil then
+            label = "Unlabelled filesystem"
+        else
+            label = "Filesystem \"" .. label .. "\""
+        end
+        label = label .. " at path \"" .. mount .. "\""
+        fileEntries[#fileEntries + 1] = mount
+        fileLabels[#fileLabels + 1] = label
+    end
+
+    if #fileEntries == 0 then
+        io.stderr:write("How are you running on a system with no filesystem?\n")
+        return 1
+    end
+
+    return input.getFromList(fileEntries, fileLabels, "filesystems", true)
+end
+
+function input.getFromPath(path, typeName, filter, first)
+    if typeName == nil then
+        typeName = "file"
+    end
+    if typeNamePlural == nil then
+        typeNamePlural = typeName .. "s"
+    end
+    typeName = typeName:sub(1, 1):upper() .. typeName:sub(2)
+
+    fileEntries = filesystem.list(path)
+    directories = {}
+    directoryLabels = {}
+    for file in fileEntries do
+        if filter ~= nil and filter(path .. file, file) then
+            directories[#directories + 1] = file
+            directoryLabels[#directoryLabels + 1] = typeName .. " \"" .. filesystem.name(file) .. "\""
+        end
+    end
+
+    if #directories == 0 then
+        return nil
+    end
+
+    return input.getFromList(directories, directoryLabels, typeNamePlural, first)
 end
 
 return input
