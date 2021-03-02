@@ -52,21 +52,6 @@ local function _protectedSection(key, fn, ...)
     return result, err
 end
 
-local function _mergeTypes(tr, side)
-    for i=1, tr.getInventorySize(side) - 1 do
-        for j=2, tr.getInventorySize(side) do
-            local stackA, stackB = tr.getStackInSlot(side, i), tr.getStackInSlot(side, j)
-
-            if stackA and stackB and tr.compareStacks(side, i, j, true) then
-                if stackA.size ~= stackA.maxSize and stackB.size ~= stackB.maxSize then
-                    local count = math.min(stackA.maxSize - stackA.size, stackB.size)
-                    tr.transferItem(side, side, count, j, i)
-                end
-            end
-        end
-    end
-end
-
 -- Logic component.
 function marketplace.logic.getSourceSide(side)
     return _marketplace.logic.sourceSide
@@ -112,7 +97,16 @@ function marketplace.transferByFilter(filter, count)
     -- Blocklist specific fields.
     filter.size = nil
 
-    local countTransferred, err = _protectedSection("logic", function()
+    return _protectedSection("logic", function()
+        -- Find an appropriate output slot.
+        local outputSlot = _firstFreeSlot(
+            _marketplace.logic.transposerComponent,
+            _marketplace.logic.sinkSide
+        )
+        if not outputSlot then
+            return 0, "No free slot in export chest."
+        end
+
         _marketplace.logic.databaseComponent.clear(DATABASE_ENTRY)
         _marketplace.logic.interfaceComponent.store(
             filter,
@@ -132,28 +126,26 @@ function marketplace.transferByFilter(filter, count)
             count
         )
 
-        -- Allow a bit of time for the items to transfer.
-        os.sleep(0.5)
-
-        -- Find an appropriate output slot.
-        local outputSlot = _firstFreeSlot(
-            _marketplace.logic.transposerComponent,
-            _marketplace.logic.sinkSide
-        )
-        if not outputSlot then
-            return 0, "No free slot in export chest."
-        end
-
         -- Use the transposer to make sure we export EXACTLY the correct number of items.
-        return _marketplace.logic.transposerComponent.transferItem(
+        local actualCount = _marketplace.logic.transposerComponent.transferItem(
             _marketplace.logic.sourceSide,
             _marketplace.logic.sinkSide,
             count,
             INTERFACE_SLOT,
             outputSlot
         )
+
+        -- Clean up the input inventory a bit.
+        _marketplace.logic.databaseComponent.clear(DATABASE_ENTRY)
+        _marketplace.logic.interfaceComponent.setInterfaceConfiguration(
+            INTERFACE_SLOT,
+            _marketplace.logic.databaseComponent.address,
+            DATABASE_ENTRY,
+            1
+        )
+
+        return actualCount
     end)
-    return countTransferred, err
 end
 
 function marketplace.transferByInternalName(name, count)
