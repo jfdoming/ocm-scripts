@@ -218,7 +218,7 @@ function marketplace.search.invoke(name)
     end
 
     local searchResult, err = _protectedSection("search", function()
-        return _marketplace.search.instance:search(name)
+        return _marketplace.search.instance:search(name:lower())
     end)
     return searchResult, err
 end
