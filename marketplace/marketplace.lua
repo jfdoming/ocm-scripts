@@ -158,16 +158,17 @@ function marketplace.transferByName(name, count)
         return 0, err
     end
 
-    local _, stack = next(result)
-    if stack == nil then
-        return 0, "Item not found."
+    local bestLabel, bestStack = nil, nil
+    for label, stack in pairs(result) do
+        if bestStack == nil or label:len() < bestLabel:len() then
+            bestLabel, bestStack = label, stack
+        end
     end
 
-    local internalName = stack.name
-    if stack ~= nil then
-        return marketplace.transferByFilter(stack, count)
+    if bestStack == nil then
+        return 0, "Item not found."
     end
-    return 0, "Item not found."
+    return marketplace.transferByFilter(bestStack, count)
 end
 
 
