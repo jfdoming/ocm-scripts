@@ -271,7 +271,11 @@ function marketplace.search.invoke(name)
     end
 
     local searchResult, err = _protectedSection("search", function()
-        return _marketplace.search.instance:search(name:lower())
+        local result = _marketplace.search.instance:search(name:lower())
+        if next(result) == nil then
+            return nil, "No results."
+        end
+        return result
     end)
     return searchResult, err
 end
