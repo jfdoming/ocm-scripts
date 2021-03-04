@@ -5,6 +5,8 @@ local mk = require("marketplace")
 local event = require("event")
 local serialization = require("serialization")
 
+local routes = require("scargiExpress.api.routes")
+
 local eventID = nil
 
 local sides = {
@@ -21,7 +23,7 @@ local REPLY_PORT = 23
 
 
 local function _makeReply(receiver, sender, meta)
-    return function(...)
+    local reply = function(...)
         local isTunnel = component.list("tunnel")[receiver] == "tunnel"
         local newMeta = serialization.serialize({
             mode = "reply",
@@ -38,18 +40,50 @@ local function _makeReply(receiver, sender, meta)
             component.modem.send(sender, REPLY_PORT, newMeta, ...)
         end
     end
+    local wrap = function(handler, serializeInput, serializeOutput, ...)
+        local input = {...}
+        if serializeInput ~= false then
+            if type(serializeInput) ~= "table" then
+                serializeInput = true
+            end
+            for i, value in ipairs(input) do
+                if serializeInput == true or serializeInput[i] then
+                    input[i] = serialization.unserialize(value)
+                end
+            end
+        end
+
+        local results = {handler(table.unpack(input))}
+
+        local serializedResults = results
+        if serializeOutput ~= false then
+            for i, result in ipairs(results) do
+                if serializeOutput == nil or serializeOutput == true or serializeOutput[i] == true then
+                    serializedResults[i] = serialization.serialize(result)
+                end
+            end
+        end
+        reply(table.unpack(serializedResults))
+
+        return table.unpack(results)
+    end
+    return {
+        send = reply,
+        wrap = wrap,
+    }
 end
 
+local function _handleMessage(trusted, reply, path, ...)
+    local route = routes[path:gsub("[^a-zA-Z0-9/_-]", "")]
+    if route == nil or (not trusted and route.trusted) or type(route.handler) ~= "function" then
+        return
+    end
 
-local function _requestItems(reply, requestSearch, requestCount)
-    local result, err = mk.transferByName(requestSearch, tonumber(requestCount))
-    reply(result, err)
-    return result, err
-end
-
-local function _trustedMessage(receiver, sender, meta, ...)
-    -- Just one path for now.
-    _requestItems(_makeReply(receiver, sender, meta), ...)
+    if route.wrap == false then
+        route.handler(reply, ...)
+    else
+        reply.wrap(route.handler, route.serializeInput, route.serializeOutput, ...)
+    end
 end
 
 local function _modemMessage(_1, receiver, sender, _3, _4, meta, ...)
@@ -62,14 +96,10 @@ local function _modemMessage(_1, receiver, sender, _3, _4, meta, ...)
         return
     end
 
-    local status, err, result = nil, nil, nil
-    if meta.trusted then
-        local status, err, result = xpcall(_trustedMessage, debug.traceback, receiver, sender, meta, ...)
-    else
-        -- Pass for now.
-    end
+    local reply = _makeReply(receiver, sender, meta)
+    local status, err, result = xpcall(_handleMessage, debug.traceback, meta.trusted, reply, ...)
     if not status then
-        io.stderr:write("[daemon] ERROR: " .. err .. "\n")
+        reply.send(nil, err)
     end
 end
 
