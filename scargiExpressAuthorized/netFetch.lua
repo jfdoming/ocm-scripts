@@ -44,9 +44,10 @@ component.tunnel.send(serialization.serialize(meta), requestName, requestCount)
 while true do
     local _1, receiver, _2, _3, _4, result, err = event.pull("modem_message")
     if receiver == component.tunnel.address then
-        if err == nil then
+        if type(result) == "number" and result > 0 then
             print(result .. " items transferred.")
-        else
+        end
+        if type(err) == "string" and err ~= nil then
             io.stderr:write(err .. "\n")
         end
         break

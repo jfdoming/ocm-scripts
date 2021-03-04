@@ -4,7 +4,8 @@ local Trie = require("trie")
 
 local DATABASE_ENTRY = 1
 local MAX_ITEM_TYPES_AT_ONCE = 1
-local INTERFACE_SLOT = 1
+local INTERFACE_BASE_SLOT = 1
+local INTERFACE_MAX_SLOT = 9
 
 local marketplace = {}
 local _marketplace = {}
@@ -25,11 +26,18 @@ _marketplace.search.inUse = false
 _marketplace.search.eventID = nil
 
 -- Utility functions.
-local function _firstFreeSlot(tr, side)
-    for i = 1, tr.getInventorySize(side) do
-        local item = tr.getStackInSlot(side, i)
+local function _firstFreeSlot(tr, side, start)
+    if start == nil then
+        start = 0
+    else
+        start = start - 1
+    end
+    local size = tr.getInventorySize(side)
+    for i = 0, size - 1 do
+        local j = ((i + start) % size) + 1
+        local item = tr.getStackInSlot(side, j)
         if item == nil then
-            return i
+            return j
         end
     end
     return nil
@@ -90,6 +98,10 @@ function marketplace.transferByFilter(filter, count)
         return 0, "Logic not configured."
     end
 
+    if count <= 0 then
+        return 0
+    end
+
     if count == nil then
         count = 1
     end
@@ -99,12 +111,12 @@ function marketplace.transferByFilter(filter, count)
 
     return _protectedSection("logic", function()
         -- Find an appropriate output slot.
-        local outputSlot = _firstFreeSlot(
+        local initialOutputSlot = _firstFreeSlot(
             _marketplace.logic.transposerComponent,
             _marketplace.logic.sinkSide
         )
-        if not outputSlot then
-            return 0, "No free slot in export chest."
+        if initialOutputSlot == nil then
+            return 0, "No space in export chest."
         end
 
         _marketplace.logic.databaseComponent.clear(DATABASE_ENTRY)
@@ -115,36 +127,72 @@ function marketplace.transferByFilter(filter, count)
             MAX_ITEM_TYPES_AT_ONCE
         )
 
-        if _marketplace.logic.databaseComponent.get(DATABASE_ENTRY) == nil then
+        local itemStack = _marketplace.logic.databaseComponent.get(DATABASE_ENTRY)
+        if itemStack == nil then
             return 0, "Item not found."
         end
 
+        -- TODO: add support for multiple slots in parallel.
+        local inputSlot = INTERFACE_BASE_SLOT
+
+        local transferAmount = math.min(count, itemStack.maxSize)
         _marketplace.logic.interfaceComponent.setInterfaceConfiguration(
-            INTERFACE_SLOT,
+            inputSlot,
             _marketplace.logic.databaseComponent.address,
             DATABASE_ENTRY,
-            count
+            transferAmount
         )
 
-        -- Use the transposer to make sure we export EXACTLY the correct number of items.
-        local actualCount = _marketplace.logic.transposerComponent.transferItem(
-            _marketplace.logic.sourceSide,
-            _marketplace.logic.sinkSide,
-            count,
-            INTERFACE_SLOT,
-            outputSlot
-        )
+        local totalRemaining = count
+        local outputSlot = nil
+        local err = nil
+        while totalRemaining > 0 do
+            local newTotal = math.max(totalRemaining - itemStack.maxSize, 0)
+            transferAmount = totalRemaining - newTotal
 
-        -- Clean up the input inventory a bit.
-        _marketplace.logic.databaseComponent.clear(DATABASE_ENTRY)
+            -- Find an appropriate output slot.
+            outputSlot = initialOutputSlot or _firstFreeSlot(
+                _marketplace.logic.transposerComponent,
+                _marketplace.logic.sinkSide,
+                outputSlot
+            )
+            initialOutputSlot = nil
+            if outputSlot == nil then
+                err = "Not enough space in export chest."
+                break
+            end
+
+            -- Use the transposer to make sure we export EXACTLY the correct number of items.
+            local actualCount = _marketplace.logic.transposerComponent.transferItem(
+                _marketplace.logic.sourceSide,
+                _marketplace.logic.sinkSide,
+                transferAmount,
+                inputSlot,
+                outputSlot
+            )
+
+            -- Clean up the input inventory a bit.
+            _marketplace.logic.databaseComponent.clear(DATABASE_ENTRY)
+            if count > 0 and count < itemStack.maxSize then
+                _marketplace.logic.interfaceComponent.setInterfaceConfiguration(
+                    inputSlot,
+                    _marketplace.logic.databaseComponent.address,
+                    DATABASE_ENTRY,
+                    count
+                )
+            end
+
+            totalRemaining = totalRemaining - actualCount
+        end
+
         _marketplace.logic.interfaceComponent.setInterfaceConfiguration(
-            INTERFACE_SLOT,
+            inputSlot,
             _marketplace.logic.databaseComponent.address,
             DATABASE_ENTRY,
             1
         )
 
-        return actualCount
+        return (count - totalRemaining), err
     end)
 end
 
