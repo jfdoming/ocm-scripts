@@ -17,9 +17,9 @@ local function _reply(meta, ...)
         if comp == nil then
             return
         end
-        comp.send(meta, ...)
+        comp.send(serialization.serialize(meta), ...)
     else
-        component.modem.send(meta.author, meta, ...)
+        component.modem.send(meta.author, serialization.serialize(meta), ...)
     end
 end
 
