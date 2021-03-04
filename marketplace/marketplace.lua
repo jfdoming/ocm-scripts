@@ -171,14 +171,19 @@ function marketplace.transferByFilter(filter, count)
                 outputSlot
             )
 
+            if not actualCount or actualCount == 0 then
+                err = "No items left to transfer!"
+                break
+            end
+
             -- Clean up the input inventory a bit.
             _marketplace.logic.databaseComponent.clear(DATABASE_ENTRY)
-            if count > 0 and count < itemStack.maxSize then
+            if totalRemaining > 0 and totalRemaining < itemStack.maxSize then
                 _marketplace.logic.interfaceComponent.setInterfaceConfiguration(
                     inputSlot,
                     _marketplace.logic.databaseComponent.address,
                     DATABASE_ENTRY,
-                    count
+                    totalRemaining
                 )
             end
 
