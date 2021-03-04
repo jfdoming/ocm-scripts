@@ -42,7 +42,7 @@ print("Requesting items...")
 component.tunnel.send(serialization.serialize(meta), requestName, requestCount)
 
 while true do
-    local _1, receiver, _2, _3, _4, result, err = event.pull("modem_message")
+    local _1, receiver, _2, _3, _4, _5, result, err = event.pull("modem_message")
     if receiver == component.tunnel.address then
         if type(result) == "number" and result > 0 then
             print(result .. " items transferred.")

@@ -11,15 +11,15 @@ local FORWARD_PORT = 22
 local REPLY_PORT = 23
 
 
-local function _reply(author, tunnel, ...)
-    if tunnel then
-        local comp = component.proxy(author)
+local function _reply(meta, ...)
+    if meta.tunnel then
+        local comp = component.proxy(meta.author)
         if comp == nil then
             return
         end
-        comp.send(...)
+        comp.send(meta, ...)
     else
-        component.modem.send(author, ...)
+        component.modem.send(meta.author, meta, ...)
     end
 end
 
@@ -36,7 +36,7 @@ local function _modemMessage(_1, receiver, sender, _3, _4, _5, ...)
     end
 
     if _5 ~= nil and _5.mode == "reply" and _5.author ~= nil and _5.tunnel ~= nil then
-        status, err, result = xpcall(_reply, debug.traceback, _5.author, _5.tunnel, ...)
+        status, err, result = xpcall(_reply, debug.traceback, _5, ...)
     else
         local tunnel = component.list("tunnel")[receiver] == "tunnel"
         status, err, result = xpcall(_forward, debug.traceback, tunnel and receiver or sender, tunnel, _5, ...)
