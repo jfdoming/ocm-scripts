@@ -16,39 +16,17 @@ local PEERS_TABLE_FILE = "/.peers"
 
 local function run(arg)
     -- Determine the filesystem/directory to write to.
-    local chosenFS = arg[1]
+    local source = arg[1]
     if chosenFS == nil then
         -- No installation path specified, let the user choose.
-        mounts = filesystem.mounts()
-        fileEntries = {}
-        fileLabels = {}
-        for node, mount in mounts do
-            local label = node.getLabel()
-            if label == nil then
-                label = "Unlabelled filesystem"
-            else
-                label = "Filesystem \"" .. label .. "\""
-            end
-            label = label .. " at path \"" .. mount .. "\""
-            fileEntries[#fileEntries + 1] = mount
-            fileLabels[#fileLabels + 1] = label
-        end
-
-        if #fileEntries == 0 then
-            io.stderr:write("How are you running on a system with no filesystem?\n")
-            return 1
-        end
-
-        chosenFS = input.getFromList(fileEntries, fileLabels, "filesystems", true)
+        chosenFS = input.getFilesystem()
         if chosenFS == nil then
-            io.stderr:write("Please specify a filesystem to install to.\n")
+            io.stderr:write("Please specify a filesystem to install tom.\n")
             return 1
         end
     end
-
-    -- Format the filesystem path.
-    if string.sub(chosenFS, -1) ~= "/" then
-        chosenFS = chosenFS .. "/"
+    if string.sub(source, -1) ~= "/" then
+        source = source .. "/"
     end
 
     -- Check for write protection.
@@ -60,22 +38,9 @@ local function run(arg)
     -- Determine the image to use.
     local chosenImage = arg[2]
     if chosenImage == nil then
-        fileEntries = filesystem.list(DEFAULT_IMAGE_SEARCH_PATH)
-        directories = {}
-        directoryLabels = {}
-        for file in fileEntries do
-            if filesystem.isDirectory(DEFAULT_IMAGE_SEARCH_PATH .. file) and file ~= IMAGE_BASE_FILE then
-                directories[#directories + 1] = file
-                directoryLabels[#directoryLabels + 1] = "Image \"" .. filesystem.name(file) .. "\""
-            end
-        end
-
-        if #directories == 0 then
-            io.stderr:write("No images available. You can download images from oppm.\n")
-            return 1
-        end
-
-        chosenImage = input.getFromList(directories, directoryLabels, "images", false)
+        chosenImage = input.getFromPath(source .. RC_SOURCE_PATH, "image", function(path, file)
+            return filesystem.isDirectory(path) and file ~= IMAGE_BASE_FILE
+        end)
         if chosenImage == nil then
             io.stderr:write("Please specify an image directory to install.\n")
             return 1
