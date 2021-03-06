@@ -72,7 +72,7 @@ end
 
 local function checkState(flags)
 	if flags:match("T") ~= nil then
-		if robot.durability() < 0.003 then
+		if robot.durability() and robot.durability() < 0.003 then
 			placeChest()
 			robot.drop(chestSide, robot.count())
 	
