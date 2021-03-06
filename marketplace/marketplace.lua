@@ -108,6 +108,7 @@ function marketplace.transferByFilter(filter, count)
 
     -- Blocklist specific fields.
     filter.size = nil
+    filter.aspects = nil
 
     return _protectedSection("logic", function()
         -- Find an appropriate output slot.
