@@ -144,7 +144,7 @@ files.encryptAndSignAll = function(sourceDir, epubkey, iv)
     local queue = {first = 1, curr = 2}
     queue[1] = sourceDir
     while queue.first < queue.curr do
-        curr = queue[queue.first]
+        local curr = queue[queue.first]
         queue.first = queue.first + 1
         for file in filesystem.list(curr) do
             file = curr .. file

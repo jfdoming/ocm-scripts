@@ -16,7 +16,7 @@ local PEERS_TABLE_FILE = "/.peers"
 
 local function run(arg)
     -- Determine the filesystem/directory to write to.
-    local source = arg[1]
+    local chosenFS = arg[1]
     if chosenFS == nil then
         -- No installation path specified, let the user choose.
         chosenFS = input.getFilesystem()
@@ -25,8 +25,8 @@ local function run(arg)
             return 1
         end
     end
-    if string.sub(source, -1) ~= "/" then
-        source = source .. "/"
+    if string.sub(chosenFS, -1) ~= "/" then
+        chosenFS = chosenFS .. "/"
     end
 
     -- Check for write protection.
@@ -38,7 +38,7 @@ local function run(arg)
     -- Determine the image to use.
     local chosenImage = arg[2]
     if chosenImage == nil then
-        chosenImage = input.getFromPath(source .. RC_SOURCE_PATH, "image", function(path, file)
+        chosenImage = input.getFromPath(chosenFS .. IMAGE_BASE_PATH, "image", function(path, file)
             return filesystem.isDirectory(path) and file ~= IMAGE_BASE_FILE
         end)
         if chosenImage == nil then
@@ -110,7 +110,7 @@ local function run(arg)
 
     -- Enable write protection.
     print("Enabling write protection...")
-    file = io.open(chosenFS .. IMAGE_WRITE_PROTECTION_FILE, "w")
+    local file = io.open(chosenFS .. IMAGE_WRITE_PROTECTION_FILE, "w")
     if file == nil then
         io.stderr:write("Failed to open file, aborting...\n")
         return 1

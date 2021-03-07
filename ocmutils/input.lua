@@ -12,7 +12,7 @@ function input.confirm(prompt, yesAnswer)
     end
 
     io.write(prompt)
-    answer = io.read()
+    local answer = io.read()
 
     if answer == nil then
         print()
@@ -70,9 +70,9 @@ function input.getFromList(list, listStrings, name, first)
 end
 
 function input.getFilesystem()
-    mounts = filesystem.mounts()
-    fileEntries = {}
-    fileLabels = {}
+    local mounts = filesystem.mounts()
+    local fileEntries = {}
+    local fileLabels = {}
     for node, mount in mounts do
         local label = node.getLabel()
         if label == nil then
@@ -97,14 +97,12 @@ function input.getFromPath(path, typeName, filter, first)
     if typeName == nil then
         typeName = "file"
     end
-    if typeNamePlural == nil then
-        typeNamePlural = typeName .. "s"
-    end
+    local typeNamePlural = typeName .. "s"
     typeName = typeName:sub(1, 1):upper() .. typeName:sub(2)
 
-    fileEntries = filesystem.list(path)
-    directories = {}
-    directoryLabels = {}
+    local fileEntries = filesystem.list(path)
+    local directories = {}
+    local directoryLabels = {}
     for file in fileEntries do
         if filter ~= nil and filter(path .. file, file) then
             directories[#directories + 1] = file

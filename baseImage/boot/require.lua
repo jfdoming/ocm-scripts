@@ -1,4 +1,4 @@
-local isPlainFile(path)
+local function isPlainFile(path)
     return component.filesystem.exists(path) and not component.filesystem.isDirectory(path)
 end
 

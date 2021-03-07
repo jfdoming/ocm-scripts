@@ -1,5 +1,5 @@
-component = require("component")
-files = require("ocmutils.files")
+local component = require("component")
+local files = require("ocmutils.files")
 
 if files.isPlainFile(files.PRKEY_PATH) then
     io.stderr:write("Keypair already exists for this computer.\n")
