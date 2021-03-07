@@ -8,7 +8,6 @@ local arg = {...}
 
 local requestName = arg[1]
 local requestCount = arg[2]
-local err = nil
 
 if requestName == nil then
     io.stdout:write("What resource would you like? ")
@@ -19,15 +18,16 @@ if requestName == nil then
 end
 
 -- Since we're connected via linked card, we need to provide the "meta" field manually.
-meta = {
+local meta = {
     trusted = true,
 }
 
 local function receiveReply()
     while true do
-        local _1, receiver, _2, _3, _4, _5, result, err = event.pull("modem_message")
+        local _1, receiver, _2, _3, _4, resultMeta, result, err = event.pull("modem_message")
         if receiver == component.tunnel.address then
-            return result, err
+            resultMeta = serialization.unserialize(resultMeta)
+            return resultMeta.code, result, err
         end
     end
 end
@@ -35,13 +35,13 @@ end
 print("Searching...")
 component.tunnel.send(serialization.serialize(meta), "api/search", requestName)
 
-local result, err = receiveReply()
+local responseCode, result, err = receiveReply()
 result = result and serialization.unserialize(result)
 if type(result) ~= "table" or err ~= nil then
     if err == nil then
         io.stderr:write("Failed to communicate with the server.")
     else
-        io.stderr:write(err)
+        io.stderr:write(responseCode .. " " .. err .. "\n")
     end
     return
 end
@@ -91,10 +91,10 @@ item = serialization.serialize(item)
 print("Requesting items...")
 component.tunnel.send(serialization.serialize(meta), "api/fetchByFilter", item, requestCount)
 
-local result, err = receiveReply()
+responseCode, result, err = receiveReply()
 if type(result) == "number" and result > 0 then
     print(result .. " items transferred.")
 end
 if type(err) == "string" and err ~= nil then
-    io.stderr:write(err .. "\n")
+    io.stderr:write(responseCode .. " " .. err .. "\n")
 end

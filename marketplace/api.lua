@@ -1,6 +1,7 @@
 local component = require("component")
 local event = require("event")
 local Trie = require("trie")
+local account = require("marketplace.account")
 
 local DATABASE_ENTRY = 1
 local MAX_ITEM_TYPES_AT_ONCE = 1
@@ -93,17 +94,42 @@ function marketplace.logic.setDatabase(c)
     _marketplace.logic.databaseComponent = c
 end
 
+function marketplace.purchaseByFilter(username, passwordCleartext, filter, count)
+    local status, data = account.authenticate(username, passwordCleartext)
+    if status ~= true then
+        return 0, data
+    end
+    local user = data
+
+    -- Treat everything as costing 1 solar for now.
+    if not user:canAfford(count) then
+        return 0, "Account cannot afford these items!"
+    end
+
+    local amountPurchased = marketplace.transferByFilter(filter, count)
+
+    if not user:deduct(amountPurchased) then
+        return 0, "Account cannot afford these items!"
+    end
+
+    if not user:commit() then
+        return 0, "Account failed to update!"
+    end
+
+    return amountPurchased
+end
+
 function marketplace.transferByFilter(filter, count)
     if _marketplace.logic.sourceSide == nil or _marketplace.logic.sinkSide == nil then
         return 0, "Logic not configured."
     end
 
-    if count <= 0 then
-        return 0
-    end
-
     if count == nil then
         count = 1
+    end
+
+    if count <= 0 then
+        return 0
     end
 
     -- Blocklist specific fields.

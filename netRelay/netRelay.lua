@@ -5,6 +5,7 @@ local event = require("event")
 local serialization = require("serialization")
 
 local eventID = nil
+local trustProvidedMeta = (args and args.trustProvidedMeta == true) or false
 local forwardingHost = args and args.forwardingHost
 
 local FORWARD_PORT = 22
@@ -12,6 +13,9 @@ local REPLY_PORT = 23
 
 
 local function _reply(meta, ...)
+    -- Safety check.
+    assert(meta and meta.mode == "___unauthenticated___reply")
+
     if meta.tunnel then
         local comp = component.proxy(meta.author)
         if comp == nil then
@@ -23,8 +27,8 @@ local function _reply(meta, ...)
     end
 end
 
-local function _forward(author, tunnel, meta, ...)
-    local newMeta = { trusted = meta and meta.trusted or false, mode = "forward", author = author, tunnel = tunnel }
+local function _forward(author, tunnel, trusted, ...)
+    local newMeta = { trusted = trusted, mode = "forward", author = author, tunnel = tunnel }
     component.modem.send(forwardingHost, FORWARD_PORT, serialization.serialize(newMeta), ...)
 end
 
@@ -35,11 +39,24 @@ local function _modemMessage(_1, receiver, sender, _3, _4, _5, ...)
         _5 = serialization.unserialize(_5)
     end
 
-    if _5 ~= nil and _5.mode == "reply" and _5.author ~= nil and _5.tunnel ~= nil then
-        status, err, result = xpcall(_reply, debug.traceback, _5, ...)
+    local meta = _5
+    if type(meta) ~= "table" then
+        meta = {}
+    end
+
+    -- The ___unauthenticated___ here is to indicate that the meta should be treated as possibly malicious.
+    if meta.mode == "___unauthenticated___reply" and meta.author ~= nil and meta.tunnel ~= nil then
+        -- Make no mistake, we don't know for sure who this is!
+        meta.trusted = false
+        status, err, result = xpcall(_reply, debug.traceback, meta, ...)
     else
         local tunnel = component.list("tunnel")[receiver] == "tunnel"
-        status, err, result = xpcall(_forward, debug.traceback, tunnel and receiver or sender, tunnel, _5, ...)
+        local author = sender
+        if tunnel then
+            author = receiver
+        end
+        local trusted = (trustProvidedMeta and meta and meta.trusted == true) or false
+        status, err, result = xpcall(_forward, debug.traceback, author, tunnel, trusted, ...)
     end
 
     if not status then

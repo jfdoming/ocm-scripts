@@ -1,32 +1,27 @@
 -- Note: this should be run as an RC script!
 
 local component = require("component")
-local mk = require("marketplace")
 local event = require("event")
 local serialization = require("serialization")
 
-local routes = require("scargiExpress.api.routes")
+local routePath = args.routePath
+if type(routePath) ~= "string" then
+    error("ERROR: invalid configuration. args.routePath is required.")
+end
+local routes = require(routePath)
 
 local eventID = nil
 
-local sides = {
-    down = 0,
-    up = 1,
-    north = 2,
-    south = 3,
-    west = 4,
-    east = 5,
-}
-
-local FORWARD_PORT = 22
-local REPLY_PORT = 23
+local FORWARD_PORT = args.forwardPort or 22
+local REPLY_PORT = args.replyPort or 23
 
 
 local function _makeReply(receiver, sender, meta)
-    local reply = function(...)
+    local reply = function(responseCode, ...)
         local isTunnel = component.list("tunnel")[receiver] == "tunnel"
         local newMeta = serialization.serialize({
-            mode = "reply",
+            mode = "___unauthenticated___reply",
+            code = responseCode,
             author = meta.author,
             tunnel = meta.tunnel
         })
@@ -40,30 +35,35 @@ local function _makeReply(receiver, sender, meta)
             component.modem.send(sender, REPLY_PORT, newMeta, ...)
         end
     end
-    local wrap = function(handler, serializeInput, serializeOutput, ...)
+    local wrap = function(route, ...)
         local input = {...}
-        if serializeInput ~= false then
-            if type(serializeInput) ~= "table" then
-                serializeInput = true
+        if route.serializeInput ~= false then
+            if type(route.serializeInput) ~= "table" then
+                route.serializeInput = true
             end
             for i, value in ipairs(input) do
-                if serializeInput == true or serializeInput[i] then
+                if route.serializeInput == true or route.serializeInput[i] then
                     input[i] = serialization.unserialize(value)
                 end
             end
         end
 
-        local results = {handler(table.unpack(input))}
+        local results = {route.handler(table.unpack(input))}
 
         local serializedResults = results
-        if serializeOutput ~= false then
+        if route.serializeOutput ~= false then
             for i, result in ipairs(results) do
-                if serializeOutput == nil or serializeOutput == true or serializeOutput[i] == true then
+                if route.serializeOutput == nil or route.serializeOutput == true or route.serializeOutput[i] == true then
                     serializedResults[i] = serialization.serialize(result)
                 end
             end
         end
-        reply(table.unpack(serializedResults))
+
+        local responseCode = 200
+        if results[1] == nil and results[2] ~= nil then
+            responseCode = 500
+        end
+        reply(responseCode, table.unpack(serializedResults))
 
         return table.unpack(results)
     end
@@ -75,14 +75,19 @@ end
 
 local function _handleMessage(trusted, reply, path, ...)
     local route = routes[path:gsub("[^a-zA-Z0-9/_-]", "")]
-    if route == nil or (not trusted and route.trusted) or type(route.handler) ~= "function" then
+    if route == nil or type(route.handler) ~= "function" then
+        reply.send(404, nil, "Not Found")
+        return
+    end
+    if (not trusted and route.trusted) then
+        reply.send(403, nil, "Forbidden")
         return
     end
 
     if route.wrap == false then
         route.handler(reply, ...)
     else
-        reply.wrap(route.handler, route.serializeInput, route.serializeOutput, ...)
+        reply.wrap(route, ...)
     end
 end
 
@@ -92,26 +97,29 @@ local function _modemMessage(_1, receiver, sender, _3, _4, meta, ...)
     end
 
     meta = serialization.unserialize(meta)
-    if meta == nil then
+    if meta == nil or type(meta) ~= "table" then
         return
     end
 
+    -- Security feature: ignore non-forwarding packets.
+    -- It's possible that a non-forwarded packet could have a malicious meta table.
     local reply = _makeReply(receiver, sender, meta)
+    if meta.mode ~= "forward" then
+        reply.send(403, nil, "This host has been configured to reject all non-forwarded packets.")
+        return
+    end
+
     local status, err, result = xpcall(_handleMessage, debug.traceback, meta.trusted, reply, ...)
     if not status then
-        reply.send(nil, err)
+        reply.send(500, nil, err)
     end
 end
 
 function start()
-    if args == nil or args.source == nil or args.sink == nil then
-        error("ERROR: invalid configuration. Please configure the \"source\" and \"sink\" parameters inside \"/etc/rc.cfg\".")
-    end
-
-    local source = sides[args.source]
-    local sink = sides[args.sink]
-    if source == nil or sink == nil then
-        error("ERROR: invalid configuration. \"source\" and \"sink\" should be strings representing sides.")
+    for _, route in pairs(routes) do
+        if type(route.initialize) == "function" then
+            route.initialize(args)
+        end
     end
 
     if eventID ~= nil then
@@ -119,17 +127,13 @@ function start()
         return
     end
 
-    mk.logic.setSourceSide(source)
-    mk.logic.setSinkSide(sink)
-    mk.search.enable()
-
     component.modem.open(FORWARD_PORT)
     eventID = event.listen("modem_message", _modemMessage)
     if eventID == false then
         -- Already running or something went wrong.
         eventID = nil
     else
-        print("Listening for item requests with event ID " .. eventID .. ".")
+        print("Server daemon running with event ID " .. eventID .. ".")
     end
 end
 
