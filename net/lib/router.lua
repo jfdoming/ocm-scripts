@@ -30,31 +30,31 @@ end
 ---@param reply Reply
 ---@param path string
 function class:handle(author, trusted, reply, path, ...)
-    path = path:gsub("[^a-zA-Z0-9/_-]", "")
+    path = path and path:gsub("[^a-zA-Z0-9/_-]", "") or ""
     local route = self.routes[path]
     if route == nil then
-        reply.send(404, nil, "Not Found")
+        reply:send(404, nil, "Not Found")
         return
     end
     if not trusted and route.trusted then
-        reply.send(403, nil, "Forbidden")
+        reply:send(403, nil, "Forbidden")
         return
     end
 
     -- Rate limit all APIs with a basic time limit.
     local rateLimit = route.rateLimit or 1
     if self:isRateLimited(author, path) then
-        self:enableRateLimitForSeconds(rateLimit)
-        reply.send(429, "Too Many Requests")
+        self:enableRateLimitForSeconds(author, path, rateLimit)
+        reply:send(429, "Too Many Requests")
         return
     end
-    self:enableRateLimitForSeconds(rateLimit)
+    self:enableRateLimitForSeconds(author, path, rateLimit)
 
     local result = nil
     if route.wrap == false then
         result = {route.handler(reply, ...)}
     else
-        result = {reply.wrap(route, ...)}
+        result = {reply:wrap(route, ...)}
     end
 
     if type(route.rateLimitOnSuccess) == "function" then

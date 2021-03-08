@@ -8,6 +8,10 @@ local serialization = require("serialization")
 ---@field meta table
 local class = {}
 
+local function _formatResults(responseCode, ...)
+    return responseCode, {...}
+end
+
 ---@param responseCode number
 function class:send(responseCode, ...)
     local isTunnel = component.list("tunnel")[self.receiver] == "tunnel"
@@ -40,7 +44,10 @@ function class:wrap(route, ...)
         end
     end
 
-    local results = {route.handler(table.unpack(input))}
+    local responseCode, results = _formatResults(route.handler(table.unpack(input)))
+    if responseCode == nil then
+        responseCode = 500
+    end
 
     local serializedResults = results
     if route.serializeOutput ~= false then
@@ -51,10 +58,6 @@ function class:wrap(route, ...)
         end
     end
 
-    local responseCode = results[1]
-    if responseCode == nil then
-        responseCode = 500
-    end
     self:send(responseCode, table.unpack(serializedResults))
 
     return table.unpack(results)

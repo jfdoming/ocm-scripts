@@ -44,21 +44,23 @@ local function _firstFreeSlot(tr, side, start)
     return nil
 end
 
+local function _parseSection(status, result, ...)
+    if not status then
+        return nil, result
+    end
+    return result, ...
+end
+
 local function _protectedSection(key, fn, ...)
     while _marketplace[key].inUse == true do
         coroutine.yield()
     end
 
     _marketplace[key].inUse = true
-    local status, result, err = xpcall(fn, debug.traceback, ...)
+    local result = {_parseSection(xpcall(fn, debug.traceback, ...))}
     _marketplace[key].inUse = false
 
-    if not status then
-        err = result
-        result = nil
-    end
-
-    return result, err
+    return table.unpack(result)
 end
 
 -- Logic component.
@@ -106,7 +108,10 @@ function marketplace.purchaseByFilter(username, passwordCleartext, filter, count
         return 422, 0, "Account cannot afford these items!"
     end
 
-    local amountPurchased = marketplace.transferByFilter(filter, count)
+    local code, amountPurchased, err = marketplace.transferByFilter(filter, count)
+    if code ~= 200 then
+        return code, amountPurchased, err
+    end
 
     if not user:deduct(amountPurchased) then
         return 422, 0, "Account cannot afford these items!"
@@ -116,12 +121,12 @@ function marketplace.purchaseByFilter(username, passwordCleartext, filter, count
         return 500, 0, "Account failed to update!"
     end
 
-    return amountPurchased
+    return 200, amountPurchased
 end
 
 function marketplace.transferByFilter(filter, count)
     if _marketplace.logic.sourceSide == nil or _marketplace.logic.sinkSide == nil then
-        return 0, "Logic not configured."
+        return 503, 0, "Logic not configured."
     end
 
     if count == nil then
@@ -129,7 +134,7 @@ function marketplace.transferByFilter(filter, count)
     end
 
     if count <= 0 then
-        return 0
+        return 422, 0, "Count must be positive."
     end
 
     -- Blocklist specific fields.

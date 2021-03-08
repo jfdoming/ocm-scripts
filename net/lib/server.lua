@@ -23,25 +23,26 @@ function Server:_receiveMessage(_1, receiver, sender, _3, _4, meta, ...)
     -- It's possible that a non-forwarded packet could have a malicious meta table.
     local reply = Reply(self.config.replyPort, receiver, sender, meta)
     if meta.mode ~= "forward" then
-        reply.send(403, nil, "This host has been configured to reject all non-forwarded packets.")
+        reply:send(403, nil, "This host has been configured to reject all non-forwarded packets.")
         return
     end
 
-    local status, err, result = xpcall(Router.handle, self.config.router, debug.traceback, meta.author, meta.trusted, reply, ...)
+    local status, err, result = xpcall(Router.handle, debug.traceback, self.config.router, meta.author, meta.trusted, reply, ...)
     if not status then
-        reply.send(500, nil, err)
+        reply:send(500, nil, err)
     end
 end
 
-function Server:start()
+---@param auxConfig table
+function Server:start(auxConfig)
     if self.eventID ~= nil then
         -- Already running.
         return
     end
 
-    for _, route in pairs(self.config.routes) do
+    for _, route in pairs(self.config.router.routes) do
         if type(route.initialize) == "function" then
-            route.initialize(self.config)
+            route.initialize(auxConfig)
         end
     end
 

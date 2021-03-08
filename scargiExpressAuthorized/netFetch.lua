@@ -89,7 +89,7 @@ end
 item = serialization.serialize(item)
 
 print("Requesting items...")
-component.tunnel.send(serialization.serialize(meta), "api/fetchByFilter", item, requestCount)
+component.tunnel.send(serialization.serialize(meta), "api/fetchByFilterTrusted", item, requestCount)
 
 responseCode, result, err = receiveReply()
 if type(result) == "number" and result > 0 then

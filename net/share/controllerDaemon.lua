@@ -6,7 +6,7 @@ local Server = require("net.server")
 local server = nil
 
 function start()
-    if server ~= nil and server.isRunning() then
+    if server ~= nil and server:isRunning() then
         return
     end
 
@@ -21,7 +21,7 @@ function start()
         replyPort = args.replyPort or 23,
     }
     server = Server(config)
-    server:start()
+    server:start(args)
 end
 
 function stop()
