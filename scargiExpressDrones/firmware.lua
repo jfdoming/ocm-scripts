@@ -1,16 +1,16 @@
-drone = component.proxy(component.list("drone")())
-net = component.proxy(component.list("modem")())
-sides = {bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5}
+local drone = component.proxy(component.list("drone")())
+local net = component.proxy(component.list("modem")())
+local sides = {bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5}
 
-DRONE_PORT = 384
-WAKE_MSG = "drone_wake"
-epsilon = 0.005
+local DRONE_PORT = 384
+local WAKE_MSG = "drone_wake"
+local epsilon = 0.005
 
-count = nil
-pickup = {}
-route = {}
+local count = nil
+local pickup = {}
+local route = {}
 
-handlers = {
+local handlers = {
     addNode = function(dx, dy, dz, ...)
         route[#route+1] = {x=dx, y=dy, z=dz}
         return true
@@ -27,16 +27,16 @@ handlers = {
     end
 }
 
-function move(dx, dy, dz)
+local function move(dx, dy, dz)
     drone.move(dx, dy, dz)
     while drone.getOffset() > epsilon do end
 end
 
-function send(func, ...)
+local function send(func, ...)
     net.broadcast(DRONE_PORT, "drone", func, ...)
 end
 
-function handleSignal(name, r, s, _1, _2, head, func, ...)
+local function handleSignal(name, r, s, _1, _2, head, func, ...)
     if not name then return nil end
     checkArg(1, name, "string")
     checkArg(6, head, "string")
@@ -44,9 +44,9 @@ function handleSignal(name, r, s, _1, _2, head, func, ...)
     if name ~= "modem_message" then return end
     if head ~= "drone" then return end
 
-    status, result = xpcall(handlers[func], debug.traceback, ...)
+    local status, result = xpcall(handlers[func], debug.traceback, ...)
     if not status then
-        send("debug", result)
+        error(result)
     end
 
     return result
@@ -55,7 +55,7 @@ end
 net.open(DRONE_PORT)
 net.setWakeMessage(WAKE_MSG)
 
-send("start")
+send("getConfig")
 
 while handleSignal(computer.pullSignal(5)) do end
 
@@ -89,15 +89,24 @@ for i=1,#route do
     move(route[i].x, route[i].y, route[i].z)
 end
 
+local t = computer.uptime()
+local failed = false
 while not drone.drop(sides.bottom) do
-    if drone.count() == 0 then break end
+    if computer.uptime() - t >= 10 then
+        failed = true
+        break
+    end
 end
 
 for i=#route,1,-1 do
     move(-route[i].x, -route[i].y, -route[i].z)
 end
 
-send("updateStatus", "standby")
+if not failed then
+    send("updateStatus", "standby")
+else
+    send("updateStatus", "failed")
+end
 
 net.close(DRONE_PORT)
 computer.shutdown()
