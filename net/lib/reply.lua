@@ -64,7 +64,7 @@ end
 ---@param receiver string
 ---@param sender string
 ---@param meta table
-local function _new(port, receiver, sender, meta)
+local function _new(_, port, receiver, sender, meta)
     return setmetatable(
         { port = port, receiver = receiver, sender = sender, meta = meta },
         { __index = class }

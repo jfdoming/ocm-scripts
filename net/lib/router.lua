@@ -98,7 +98,7 @@ local function _validate(routes)
 end
 
 ---@param routeFilePath string
-local function _new(routeFilePath)
+local function _new(_, routeFilePath)
     local status, routes = pcall(require, routeFilePath)
     if not status then
         error("Invalid route definition file.")

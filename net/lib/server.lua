@@ -68,7 +68,7 @@ function Server:isRunning()
     return self.eventID ~= nil
 end
 
-local function _new(config)
+local function _new(_, config)
     return setmetatable({ config = config }, { __index = Server })
 end
 
