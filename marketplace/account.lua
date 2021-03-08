@@ -66,26 +66,26 @@ end
 
 function account.authenticate(username, passwordCleartext)
     if not component.isAvailable("data") or not instance then
-        return nil, "Cannot authenticate users right now."
+        return 500, nil, "Cannot authenticate users right now."
     end
 
     local userData = instance:read(username)
     if userData == nil then
         -- It's best security practice to not tell the client whether the username exists.
-        return false, "Invalid credentials."
+        return 401, false, "Invalid credentials."
     end
 
     local passwordHashed = component.data.sha256(passwordCleartext .. userData.salt .. pepper)
     if passwordHashed ~= userData.passwordHashed then
-        return false, "Invalid credentials."
+        return 401, false, "Invalid credentials."
     end
 
-    return true, _newUserObject(username, userData)
+    return 200, true, _newUserObject(username, userData)
 end
 
 function account.create(username, passwordCleartext)
     if not component.isAvailable("data") or not instance then
-        return nil, "Cannot create user accounts right now."
+        return 503, nil, "Cannot create user accounts right now."
     end
 
     if (
@@ -96,7 +96,7 @@ function account.create(username, passwordCleartext)
         or passwordCleartext:len() < 8
         or instance:exists(username)
     ) then
-        return false, "Invalid username-password combination."
+        return 422, false, "Invalid username-password combination."
     end
 
     local userData = {}
@@ -105,9 +105,9 @@ function account.create(username, passwordCleartext)
     userData.balance = 0
 
     if instance:write(username, userData) == nil then
-        return false, "Failed to create user account."
+        return 500, false, "Failed to create user account."
     end
-    return true
+    return 201, true
 end
 
 return account

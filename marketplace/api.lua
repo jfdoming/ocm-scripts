@@ -62,32 +62,32 @@ local function _protectedSection(key, fn, ...)
 end
 
 -- Logic component.
-function marketplace.logic.getSourceSide(side)
+function marketplace.logic.getSourceSide()
     return _marketplace.logic.sourceSide
 end
 function marketplace.logic.setSourceSide(side)
     _marketplace.logic.sourceSide = side
 end
-function marketplace.logic.getSinkSide(side)
+function marketplace.logic.getSinkSide()
     return _marketplace.logic.sinkSide
 end
 function marketplace.logic.setSinkSide(side)
     _marketplace.logic.sinkSide = side
 end
 
-function marketplace.logic.getInterface(c)
+function marketplace.logic.getInterface()
     return _marketplace.logic.interfaceComponent
 end
 function marketplace.logic.setInterface(c)
     _marketplace.logic.interfaceComponent = c
 end
-function marketplace.logic.getTransposer(c)
+function marketplace.logic.getTransposer()
     return _marketplace.logic.transposerComponent
 end
 function marketplace.logic.setTransposer(c)
     _marketplace.logic.transposerComponent = c
 end
-function marketplace.logic.getDatabase(c)
+function marketplace.logic.getDatabase()
     return _marketplace.logic.databaseComponent
 end
 function marketplace.logic.setDatabase(c)
@@ -95,25 +95,25 @@ function marketplace.logic.setDatabase(c)
 end
 
 function marketplace.purchaseByFilter(username, passwordCleartext, filter, count)
-    local status, data = account.authenticate(username, passwordCleartext)
+    local code, status, data = account.authenticate(username, passwordCleartext)
     if status ~= true then
-        return 0, data
+        return code, 0, data
     end
     local user = data
 
     -- Treat everything as costing 1 solar for now.
     if not user:canAfford(count) then
-        return 0, "Account cannot afford these items!"
+        return 422, 0, "Account cannot afford these items!"
     end
 
     local amountPurchased = marketplace.transferByFilter(filter, count)
 
     if not user:deduct(amountPurchased) then
-        return 0, "Account cannot afford these items!"
+        return 422, 0, "Account cannot afford these items!"
     end
 
     if not user:commit() then
-        return 0, "Account failed to update!"
+        return 500, 0, "Account failed to update!"
     end
 
     return amountPurchased
@@ -143,7 +143,7 @@ function marketplace.transferByFilter(filter, count)
             _marketplace.logic.sinkSide
         )
         if initialOutputSlot == nil then
-            return 0, "No space in export chest."
+            return 503, 0, "No space in export chest."
         end
 
         _marketplace.logic.databaseComponent.clear(DATABASE_ENTRY)
@@ -156,7 +156,7 @@ function marketplace.transferByFilter(filter, count)
 
         local itemStack = _marketplace.logic.databaseComponent.get(DATABASE_ENTRY)
         if itemStack == nil then
-            return 0, "Item not found."
+            return 404, 0, "Item not found."
         end
 
         -- TODO: add support for multiple slots in parallel.
@@ -172,6 +172,7 @@ function marketplace.transferByFilter(filter, count)
 
         local totalRemaining = count
         local outputSlot = nil
+        local code = 200
         local err = nil
         while totalRemaining > 0 do
             local newTotal = math.max(totalRemaining - itemStack.maxSize, 0)
@@ -185,6 +186,7 @@ function marketplace.transferByFilter(filter, count)
             )
             initialOutputSlot = nil
             if outputSlot == nil then
+                code = 503
                 err = "Not enough space in export chest."
                 break
             end
@@ -199,6 +201,7 @@ function marketplace.transferByFilter(filter, count)
             )
 
             if not actualCount or actualCount == 0 then
+                code = 503
                 err = "No items left to transfer!"
                 break
             end
@@ -224,7 +227,7 @@ function marketplace.transferByFilter(filter, count)
             1
         )
 
-        return (count - totalRemaining), err
+        return code, (count - totalRemaining), err
     end)
 end
 
@@ -235,7 +238,7 @@ end
 function marketplace.transferByName(name, count)
     local result, err = marketplace.search.invoke(name)
     if result == nil then
-        return 0, err
+        return 404, 0, err
     end
 
     local bestLabel, bestStack = nil, nil
@@ -246,7 +249,7 @@ function marketplace.transferByName(name, count)
     end
 
     if bestStack == nil then
-        return 0, "Item not found."
+        return 404, 0, "Item not found."
     end
     return marketplace.transferByFilter(bestStack, count)
 end
@@ -290,11 +293,11 @@ function marketplace.search.isEnabled()
 end
 function marketplace.search.invoke(name)
     if name == nil then
-        return nil, "Search string is required."
+        return 400, nil, "Search string is required."
     end
 
     if _marketplace.search.instance == nil then
-        return nil, "Search not enabled."
+        return 503, nil, "Search not enabled."
     end
 
     local searchResult, err = _protectedSection("search", function()
@@ -304,7 +307,7 @@ function marketplace.search.invoke(name)
         end
         return result
     end)
-    return searchResult, err
+    return 200, searchResult, err
 end
 
 

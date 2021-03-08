@@ -4,22 +4,32 @@ local sides = require("sides")
 
 return {
     ["api/createAccount"] = {
+        rateLimit = 5,
+        rateLimitOnSuccess = function(_, result)
+            if result == true then
+                return 60
+            end
+            return 0
+        end,
         serializeInput = false,
         serializeOutput = false,
         handler = account.create,
     },
     ["api/fetchByName"] = {
+        rateLimit = 10,
         trusted = true,
         serializeInput = false,
         serializeOutput = false,
         handler = mk.transferByName,
     },
     ["api/fetchByFilter"] = {
+        rateLimit = 10,
         serializeInput = {false, false, true, false},
         serializeOutput = false,
         handler = mk.purchaseByFilter,
     },
     ["api/fetchByFilterTrusted"] = {
+        rateLimit = 3,
         trusted = true,
         serializeInput = {true, false},
         serializeOutput = false,
@@ -42,6 +52,7 @@ return {
     },
     ["api/search"] = {
         serializeInput = false,
+        rateLimit = 3,
         handler = mk.search.invoke,
         initialize = mk.search.enable,
     },
